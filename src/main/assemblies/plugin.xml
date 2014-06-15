@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<assembly>
+    <id>plugin</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+    <dependencySets>
+        <dependencySet>
+            <outputDirectory>/</outputDirectory>
+            <useProjectArtifact>true</useProjectArtifact>
+            <useTransitiveFiltering>true</useTransitiveFiltering>
+            <excludes>
+                <exclude>org.elasticsearch:elasticsearch</exclude>
+            </excludes>
+        </dependencySet>
+        <dependencySet>
+            <outputDirectory>/</outputDirectory>
+            <useProjectArtifact>true</useProjectArtifact>
+            <useTransitiveFiltering>true</useTransitiveFiltering>
+            <includes>
+                <include>org.apache.kafka:kafka</include>
+                <include>com.netflix.curator:curator-framework</include>
+                <include>org.scala-lang:scala-library</include>
+                <include>org.apache.zookeeper:zookeeper</include>
+				<include>net.sf.jopt-simple:jopt-simple</include>
+				<include>com.github.sgroschupf:zkclient</include>
+				<include>org.xerial.snappy:snappy-java</include>
+				<include>org.codehaus.jackson:jackson-mapper-asl</include>
+				<include>log4j:log4j</include>
+				<include>com.timgroup:java-statsd-client</include>				
+            </includes>
+        </dependencySet>
+    </dependencySets>
+</assembly>
