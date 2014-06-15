@@ -17,7 +17,7 @@
 
 * Lets say, `Topic_1` has 5 partitions.
 
-* Now, there is a needed to read, process the messages from Kafka and ElasticSearch
+* Now, there is a needed to read, process the messages from Kafka and index it in ElasticSearch
 
 * In order to do that, have 5 Config Files and start 5 instances of this Standalone Consumer by tying each config file to the respective Consumer Instance.
 
