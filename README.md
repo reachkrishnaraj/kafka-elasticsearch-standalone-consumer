@@ -13,7 +13,7 @@
 
 ### _As described in the illustration above, here is how the StandAlone Consumer works:_
 
-* Kafka has a topic named, say `Topic_1`
+* Lets say, Kafka has a topic named, say `Topic_1`
 
 * Lets say, `Topic_1` has 5 partitions.
 
