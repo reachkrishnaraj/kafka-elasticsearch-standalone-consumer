@@ -6,7 +6,6 @@
 
 ![](https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/master/img/Kafka_ES_Illustration.png)
 
-![](https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch/master/img/Kafka_ES_standalone_consumer.png)
 
 # Introduction
 
