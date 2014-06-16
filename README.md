@@ -116,7 +116,7 @@ The details of each config property can be seen in the template file (below)
 
 * Usually, its effective to Index the message in JSON format in ElasticSearch. This can be done using a Mapper Class and transforming the message from Kafka by overriding/implementing the `transformMessage()` method. An example can be found here: `org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler`
 
-* _**Do remember to set the newly created message handler class in the `messageHandlerClass` config property of the consumer instance.**_
+* _**Do remember to set the newly created(if) message handler class in the `messageHandlerClass` config property of the consumer instance.**_
 
 # License
 
