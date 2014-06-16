@@ -104,7 +104,7 @@ _The below log file contains ERROR during starting, restarting & stopping the Co
 
 The details of each config property can be seen in the template file (below)
 
-    https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/master/config/kafkaESConsumer.properties
+    
 
 # Message Handler Class
 
