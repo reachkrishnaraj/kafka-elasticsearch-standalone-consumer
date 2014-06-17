@@ -13,11 +13,11 @@
 
 ### _As described in the illustration above, here is how the StandAlone Consumer works:_
 
-* Lets say, Kafka has a topic named, say `Topic_1`
+* Kafka has a topic named, say `Topic_1`
 
 * Lets say, `Topic_1` has 5 partitions.
 
-* Now, there is a needed to read, process the messages from Kafka and index it in ElasticSearch
+* Now, there is a needed to read, process the messages from Kafka and ElasticSearch
 
 * In order to do that, have 5 Config Files and start 5 instances of this Standalone Consumer by tying each config file to the respective Consumer Instance.
 
@@ -100,12 +100,13 @@ _The below log file contains ERROR during starting, restarting & stopping the Co
 
 ### ElasticSearch: 1.0.0
 
+### Scala Version for Kafka Build: 2.10.0
+
 # Configuring the Consumer Instance:
 
 The details of each config property can be seen in the template file (below)
 
-[Config File with details about each property](https://github.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/blob/master/config/kafkaESConsumer.properties)    
-
+[Config File with details about each property](https://github.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/blob/master/config/kafkaESConsumer.properties)
 
 # Message Handler Class
 
@@ -117,7 +118,7 @@ The details of each config property can be seen in the template file (below)
 
 * Usually, its effective to Index the message in JSON format in ElasticSearch. This can be done using a Mapper Class and transforming the message from Kafka by overriding/implementing the `transformMessage()` method. An example can be found here: `org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler`
 
-* _**Do remember to set the newly created(if) message handler class in the `messageHandlerClass` config property of the consumer instance.**_
+* _**Do remember to set the newly created message handler class in the `messageHandlerClass` config property of the consumer instance.**_
 
 # License
 
