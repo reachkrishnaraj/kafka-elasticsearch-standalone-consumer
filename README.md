@@ -11,6 +11,8 @@
 
 ### **Kafka Standalone Consumer will read the messages from Kafka, processes and index them in ElasticSearch.**
 
+### **Easily Scaleable & Extendable !**
+
 ### _As described in the illustration above, here is how the StandAlone Consumer works:_
 
 * Kafka has a topic named, say `Topic_1`
