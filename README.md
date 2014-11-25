@@ -56,8 +56,19 @@ _It is **IMPORTANT to SPECIFY 1 UNIQUE LOG PROPERTY FILE(using the below propert
 
 
     cd $CONSUMER_HOME/scripts
+    
+    vi consumerNew.sh
+    
+    Provide the value for all the below variables:
+    
+    # Setup variables
+    #Set the relative directory from which this script is run
+    base_dir=
+    JAVA_HOME=
+    #User as which the Consumer Daemon has to be run
+    USER=
 
-    ./consumer.sh -p start -c $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
+    ./consumerNew.sh -p start -c $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
 
     # ' -p ' - Can take either start | stop | restart
     
@@ -88,19 +99,19 @@ _The below log file contains ERROR during starting, restarting & stopping the Co
 
     cd $CONSUMER_HOME/scripts
 
-    ./consumer.sh -p stop -c $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
+    ./consumerNew.sh -p stop -c $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
 
 **8. To Restart the Consumer Instance:**
 
     cd $CONSUMER_HOME/scripts
 
-    ./consumer.sh -p restart -c $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
+    ./consumerNew.sh -p restart -c $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
 
 # Versions:
 
 ### Kafka Version: 0.8.1
 
-### ElasticSearch: 1.0.0
+### ElasticSearch: > 1.0.0 (Works great for 1.3.4 as well in my Production)
 
 ### Scala Version for Kafka Build: 2.10.0
 
