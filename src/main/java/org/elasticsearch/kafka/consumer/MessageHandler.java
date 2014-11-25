@@ -1,13 +1,17 @@
 package org.elasticsearch.kafka.consumer;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 
 import org.apache.log4j.Logger;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.kafka.consumer.helpers.ExceptionHelper;
+
 import kafka.message.Message;
 
 
@@ -18,7 +22,9 @@ public abstract class MessageHandler {
 	private ConsumerConfig config;
 	private BulkRequestBuilder bulkReqBuilder;
 	private ArrayList<Object> esPostObject= new ArrayList<Object>();
+	private LinkedHashMap<Long, Object> offsetFailedMsgMap = new LinkedHashMap<Long, Object>();
 	Logger logger = ConsumerLogger.getLogger(this.getClass());
+	protected int sizeOfOffsetMsgMap;
 		
 	public MessageHandler(){
 	}
@@ -43,8 +49,20 @@ public abstract class MessageHandler {
 		return offsetMsgMap;
 	}
 
+	public int getSizeOfOffsetMsgMap() {
+		return sizeOfOffsetMsgMap;
+	}
+
 	public void setOffsetMsgMap(LinkedHashMap<Long, Message> offsetMsgMap) {
 		this.offsetMsgMap = offsetMsgMap;
+	}
+	
+	public LinkedHashMap<Long, Object> getOffsetFailedMsgMap() {
+		return offsetFailedMsgMap;
+	}
+
+	public void setOffsetFailedMsgMap(LinkedHashMap<Long, Object> offsetFailedMsgMap) {
+		this.offsetFailedMsgMap = offsetFailedMsgMap;
 	}
 
 	public ConsumerConfig getConfig() {
@@ -82,6 +100,7 @@ public abstract class MessageHandler {
 	
 	public boolean postToElasticSearch() throws Exception {
 		BulkResponse bulkResponse = null;
+		BulkItemResponse bulkItemResp = null;
 		//Nothing/NoMessages to post to ElasticSearch
 		if(this.bulkReqBuilder.numberOfActions() <= 0){
 			logger.warn("BulkReqBuilder doesnt have any messages to post to ElasticSearch.Will simply return to main ConsumerJob");
@@ -90,15 +109,31 @@ public abstract class MessageHandler {
 		try{
 			bulkResponse = this.bulkReqBuilder.execute().actionGet();
 		}
-		catch(Exception e){
-			logger.fatal("Failed to post the messages to ElasticSearch. Throwing the error. Error Message is::" + e.getMessage());
-			
+		catch(ElasticsearchException esE){
+			logger.fatal("Failed to post the messages to ElasticSearch. Throwing the error. Error Message is::" + ExceptionHelper.getStrackTraceAsString(esE));
+			throw esE;
 		}
 		logger.info("Time took to post the bulk messages to post to ElasticSearch is::" + bulkResponse.getTookInMillis() + "milli seconds");
 		if(bulkResponse.hasFailures()){
 			logger.error("Bulk Message Post to ElasticSearch has error. Failure message is::" + bulkResponse.buildFailureMessage());
 				int failedCount = 1;
-				for (BulkItemResponse resp : bulkResponse) {
+				Iterator<BulkItemResponse> bulkRespItr = bulkResponse.iterator();
+				while (bulkRespItr.hasNext()){
+					bulkItemResp = bulkRespItr.next();
+					bulkRespItr.remove();
+					
+					if (bulkItemResp.isFailed()) {
+						//Need to handle failure messages logging in a better way
+						logger.info("Failed Message # " + failedCount + " is::" + bulkItemResp.getFailure().getMessage());
+						failedCount++;
+						} else {
+							//Do stats handling here
+						}
+					
+				}
+				
+				//Below block of code is optimized as seen above. Need to remove the below code block.
+				/*for (BulkItemResponse resp : bulkResponse) {
 					logger.info("**** Failed Messages are: *****");	
 				if (resp.isFailed()) {
 					//Need to handle failure messages logging in a better way
@@ -107,23 +142,26 @@ public abstract class MessageHandler {
 					} else {
 						//Do stats handling here
 					}
-				}
+				}*/
 				
-				int msgFailurePercentage = (Integer)((failedCount/offsetMsgMap.size()) * 100); 
+				int msgFailurePercentage = (Integer)((failedCount/this.getSizeOfOffsetMsgMap()) * 100); 
 				logger.info("% of failed message post to ElasticSearch is::" + msgFailurePercentage);
 				logger.info("ElasticSearch msg failure tolerance % is::" + this.config.esMsgFailureTolerancePercent);
 				if(msgFailurePercentage > this.config.esMsgFailureTolerancePercent){
 					logger.error("% of failed messages is GREATER than set tolerance.Hence would return to consumer job with FALSE");
+					this.bulkReqBuilder = null;
 					return false;
 				}
 				else{
 					logger.info("% of failed messages is LESSER than set tolerance.Hence would return to consumer job with TRUE");
+					this.bulkReqBuilder = null;
 					return true;
 				}
 					
 				
 			}
 		logger.info("Bulk Post to ElasticSearch was success with no single error. Returning to consumer job with true.");
+		this.bulkReqBuilder = null;
 		return true;
 	}
 

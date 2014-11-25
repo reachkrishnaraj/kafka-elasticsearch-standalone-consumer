@@ -21,6 +21,8 @@ public class ConsumerConfig {
 	public final String messageHandlerClass;
 	//Kafka Broker's IP Address/HostName
 	public final String brokerHost;
+	//Kafka's Broker List for producer
+	public final String brokerListForProducer;
 	//Kafka Broker's Port number
 	public final int brokerPort;
 	//Kafka Topic from which the message has to be processed
@@ -30,7 +32,7 @@ public class ConsumerConfig {
 	//Option from where the message fetching should happen in Kafka
 	// Values can be: CUSTOM/OLDEST/LATEST/RESTART.
 	// If 'CUSTOM' is set, then 'startOffset' has to be set an int value
-	public final String startOffsetFrom;
+	public String startOffsetFrom;
 	//int value of the offset from where the message processing should happen
 	public final int startOffset;
 	//Name of the Kafka Consumer Group
@@ -48,6 +50,8 @@ public class ConsumerConfig {
 	public final boolean isGuranteedEsPostMode;
 	//Name of the ElasticSearch Cluster
 	public final String esClusterName;
+	//Name of the ElasticSearch Host Port List
+	public final String esHostPortList;
 	//Hostname/ipAddress of ElasticSearch
 	public final String esHost;
 	//Port number of ElasticSearch
@@ -61,12 +65,28 @@ public class ConsumerConfig {
 	
 	//Log property file for the consumer instance
 	public final String logPropertyFile;
+
+	//determines whether the consumer will post to ElasticSearch or not
+	//If set to true, the consumer will read from Kafka, transform it and wont post of ElasticSearch
+	public final String isDryRun;
 	
+	//Wait time in seconds between consumer job rounds
+	public final int consumerSleepTime;
+	
+	
+	public String getStartOffsetFrom() {
+		return startOffsetFrom;
+	}
+
+	public void setStartOffsetFrom(String startOffsetFrom) {
+		this.startOffsetFrom = startOffsetFrom;
+	}
 
 	public ConsumerConfig(String configFile) throws Exception {
 		try {
 			//logger.info("configFile Passed::"+configFile);
 			input = this.getClass().getClassLoader().getResourceAsStream(configFile);
+			System.out.println("input" + input);
 			//logger.info("configFile loaded Successfully");
 			System.out.println("configFile loaded Successfully");
 		} catch (Exception e) {
@@ -77,13 +97,14 @@ public class ConsumerConfig {
 		} 
 		
 		if (input != null) {
-			System.out.println("configFile NOT loaded Successfully.Hence reading the default values for the properties");
+			System.out.println("configFile loaded Successfully.Hence reading the default values for the properties");
 			// load the properties file
 			prop.load(input);
 			zookeeper = (String) prop.getProperty("zookeeper", "localhost");
 			messageHandlerClass = prop.getProperty("messageHandlerClass", "org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler");
 			brokerHost = prop.getProperty("brokerHost", "localhost");
 			brokerPort = Integer.parseInt(prop.getProperty("brokerPort", "9092"));
+			brokerListForProducer = prop.getProperty("brokerListForProducer", brokerHost + ":" + brokerPort);
 			topic = prop.getProperty("topic", "");
 			partition = Short.parseShort(prop.getProperty("partition", "0"));
 			startOffsetFrom = prop.getProperty("startOffsetFrom", "");
@@ -103,16 +124,20 @@ public class ConsumerConfig {
 			esClusterName = prop.getProperty("esClusterName", "");
 			esHost = prop.getProperty("esHost", "localhost");
 			esPort = Integer.parseInt(prop.getProperty("esPort", "9300"));
+			esHostPortList = prop.getProperty("esHostPortList", "localhost:9300");
 			esIndex = prop.getProperty("esIndex", "kafkaConsumerIndex");
 			esIndexType = prop.getProperty("esIndexType", "kafka");
 			esMsgFailureTolerancePercent = Integer.parseInt(prop.getProperty("esMsgFailureTolerancePercent", "5"));
 			logPropertyFile = prop.getProperty("logPropertyFile", "log4j.properties");
+			isDryRun = prop.getProperty("isDryRun", "false");
+			consumerSleepTime = Integer.parseInt(prop.getProperty("consumerSleepTime", "25"));
 			
 		} else {
 			zookeeper = "localhost";
 			messageHandlerClass = "";
-			brokerHost = "";
-			brokerPort = 0;
+			brokerHost = "localhost";
+			brokerPort = 9092;
+			brokerListForProducer = brokerHost + ":" + brokerPort;
 			topic = "";
 			partition = 0;
 			startOffsetFrom = "";
@@ -127,12 +152,17 @@ public class ConsumerConfig {
 			isGuranteedEsPostMode = false;
 			esClusterName = "elasticsearch";
 			esHost = "localhost";
-			esPort = 9200;
+			esPort = 9300;
+			esHostPortList="localhost:9300";
 			esIndex = "kafkaConsumerIndex";
 			esIndexType = "kafka";
 			esMsgFailureTolerancePercent = 5;
 			logPropertyFile = "log4j.properties";
+			isDryRun = "false";
+			consumerSleepTime = 25;
 		}
+	
+		
 	input.close();
 	System.out.println("Config reading complete !");
 	//logger.info("configFile loaded,read and closed Successfully");

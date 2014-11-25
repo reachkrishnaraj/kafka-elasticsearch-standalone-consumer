@@ -15,6 +15,8 @@ public class ConsumerLogger {
 		System.out.println("logPropertyFile::" + config.logPropertyFile);
 		System.out.println("logPropFileInStr::" + ConsumerLogger.class.getClassLoader().getResourceAsStream(config.logPropertyFile));
 		logProp.load(ConsumerLogger.class.getClassLoader().getResourceAsStream(config.logPropertyFile));
+		logProp.setProperty("log4j.appender.file.File", logProp.get("log4j.appender.file.Folder") + "/" + config.consumerGroupName + "_" + config.topic + "_" + config.partition + ".log");
+		System.out.println("log file==" + logProp.get("log4j.appender.file.File"));
 		PropertyConfigurator.configure(logProp);
 		//PropertyConfigurator.configure(config.logPropertyFile);
 	}

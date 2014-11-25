@@ -13,9 +13,11 @@ public class AccessLogMapper {
 	private Integer responseTime;
 	private Integer responseCode;
 	private String hostName;
-	private String serverAndInstance;
 	private String serverName;
+	private String serverAndInstance;
 	private String instance;
+	private String sourceIpAndPort;
+	private String ajpThreadName;
 	private String rawMessage;
 
 	public KafkaMetaDataMapper getKafkaMetaData() {
@@ -122,6 +124,14 @@ public class AccessLogMapper {
 		this.instance = instance;
 	}
 
+	public String getSourceIpAndPort() {
+		return sourceIpAndPort;
+	}
+
+	public void setSourceIpAndPort(String sourceIpAndPort) {
+		this.sourceIpAndPort = sourceIpAndPort;
+	}
+
 	public String getServerAndInstance() {
 		return serverAndInstance;
 	}
@@ -138,4 +148,14 @@ public class AccessLogMapper {
 		this.rawMessage = rawMessage;
 	}
 
+	public String getAjpThreadName() {
+		return ajpThreadName;
+	}
+
+	public void setAjpThreadName(String ajpThreadName) {
+		this.ajpThreadName = ajpThreadName;
+	}
+
+	
+	
 }

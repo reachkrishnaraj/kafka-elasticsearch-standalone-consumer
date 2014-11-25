@@ -78,7 +78,12 @@ public class KafkaClient {
 		initConsumer();
 		
 	}
-
+	
+	void connectToZooKeeper() throws Exception {
+		connectToZooKeeper(this.zooKeeper);
+	}
+	
+	
 	void connectToZooKeeper(String zooKeeper) throws Exception {
 		try {
 			curator = CuratorFrameworkFactory.newClient(zooKeeper, 1000, 15000,
@@ -93,7 +98,7 @@ public class KafkaClient {
 
 	public void initConsumer() throws Exception{
 		try{
-			this.simpleConsumer = new SimpleConsumer(this.leadBrokerHost, this.leadBrokerPort, 5000, 1024 * 1024 * 10, this.clientName);
+			this.simpleConsumer = new SimpleConsumer(this.leadBrokerHost, this.leadBrokerPort, 10000, 1024 * 1024 * 10, this.clientName);
 			logger.info("Succesfully initialized Kafka Consumer");
 		}
 		catch(Exception e){
@@ -101,41 +106,6 @@ public class KafkaClient {
 			throw e;
 		}
 	}
-	//This method is NOT USED. Revisit to delete
-	public void save(String path, String data) throws Exception {
-		try {
-			if (curator.checkExists().forPath(path) == null) {
-				curator.create().creatingParentsIfNeeded()
-						.withMode(CreateMode.PERSISTENT)
-						.forPath(path, data.getBytes());
-			} else {
-				curator.setData().forPath(path, data.getBytes());
-			}
-		} catch (Exception e) {
-			//logger.error("Error trying to save" + e.getMessage());
-			throw e;
-		}
-	}
-	
-	//This method is NOT USED. Revisit to delete
-	public String get(String path) {
-		try {
-			if (curator.checkExists().forPath(path) != null) {
-				return new String(curator.getData().forPath(path));
-			} else {
-				return null;
-			}
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		}
-	}
-	
-	//This method is NOT USED. Revisit to delete
-	public void saveOffset(String topic, int partition, long offset) throws Exception {
-		save(String.format("/es-river-kafka/offsets/%s/%s/%d",
-				this.leadBrokerURL, topic, partition), Long.toString(offset));
-	}
-
 
 	public short saveOffsetInKafka(long offset, short errorCode) throws Exception{
 		logger.info("Starting to save the Offset value to Kafka. Offset value is::" + offset + " and errorCode passed is::" + errorCode);
@@ -191,7 +161,7 @@ public class KafkaClient {
 			for (TopicMetadata item : metaData) {
 				for (PartitionMetadata part : item.partitionsMetadata()) {
 					if (part.partitionId() == this.partition) {
-						System.out.println("ITS TRUE");
+						//System.out.println("ITS TRUE");
 						returnMetaData = part;
 					break;
 					}
@@ -276,7 +246,7 @@ public class KafkaClient {
 	
 	public long getOldestOffset() throws Exception {
 		Long oldestOffet;
-		logger.info("Trying to get the OldestOffset for the topic: " + this.clientName);
+		logger.info("Trying to get the OldestOffset for the topic: " + this.topic);
 		try{
 			oldestOffet = this.getOffset(this.topic, this.partition, OffsetRequest.EarliestTime(), this.clientName);
 		}
