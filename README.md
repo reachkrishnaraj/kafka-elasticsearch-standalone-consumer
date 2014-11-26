@@ -62,7 +62,7 @@ _It is **IMPORTANT to SPECIFY 1 UNIQUE LOG PROPERTY FILE(using the below propert
     Provide the value for all the below variables:
     
     # Setup variables
-    #Set the relative directory from which this script is run
+    #Set the full path of top directory of this kafka consumer
     base_dir=
     JAVA_HOME=
     #User as which the Consumer Daemon has to be run
