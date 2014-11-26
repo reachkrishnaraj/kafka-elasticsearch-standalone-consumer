@@ -8,7 +8,7 @@ do
         esac
 done
 # Setup variables
-#Set the relative directory from which this script is run
+#Set the full path of top directory of this kafka consumer
 base_dir=<base_dir_where_you_have_this_kafkaConsumer>
 JAVA_HOME=<Java_jdk_home_dir>
 #User as which the Consumer Daemon has to be run
