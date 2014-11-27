@@ -22,6 +22,8 @@ public class RawMessageStringHandler extends MessageHandler {
 		
 	public void transformMessage() throws Exception{
 		logger.info("Starting to transformMessages into String Messages");
+		logger.info("# of message available for this round is:" + this.getOffsetMsgMap().size());
+
 		this.getEsPostObject().clear();
 		Iterator<Map.Entry<Long,Message>> offsetMsgMapItr = this.getOffsetMsgMap().entrySet().iterator();
 		while (offsetMsgMapItr.hasNext()) {
@@ -32,13 +34,7 @@ public class RawMessageStringHandler extends MessageHandler {
 			this.getEsPostObject().add(new String(bytes, "UTF-8"));
 			offsetMsgMapItr.remove();
 		}
-		//Above code will remove the message from the LinkedHashMap and hence good for memory. Need to remove the below block of code.
-		/*for(Long offsetKey : this.getOffsetMsgMap().keySet()){
-			ByteBuffer payload = this.getOffsetMsgMap().get(offsetKey).payload();
-            byte[] bytes = new byte[payload.limit()];
-            payload.get(bytes);
-			this.getEsPostObject().add(new String(bytes, "UTF-8"));
-		}*/
+
 		logger.info("Completed transforming Messages into String Messages");
 	}
 	
@@ -54,12 +50,8 @@ public class RawMessageStringHandler extends MessageHandler {
 		}
 		this.getEsPostObject().clear();
 		//Above code will remove the message from the ArrayList and hence good for memory. Need to remove the below block of code.
-		/*for (Object eachMsg : this.getEsPostObject()){
-			buildReqBuilder.add(this.getEsClient().prepareIndex(this.getConfig().esIndex, this.getConfig().esIndexType).setSource((String)eachMsg));
-		}*/
 		
 		logger.info("Completed setting the messages in the buildReqBuilder for ES");
-		//this.setBuildReqBuilder(buildReqBuilder);
 	}
 
 }

@@ -131,19 +131,7 @@ public abstract class MessageHandler {
 						}
 					
 				}
-				
-				//Below block of code is optimized as seen above. Need to remove the below code block.
-				/*for (BulkItemResponse resp : bulkResponse) {
-					logger.info("**** Failed Messages are: *****");	
-				if (resp.isFailed()) {
-					//Need to handle failure messages logging in a better way
-					logger.info("Failed Message # " + failedCount + " is::" + resp.getFailure().getMessage());
-					failedCount++;
-					} else {
-						//Do stats handling here
-					}
-				}*/
-				
+								
 				int msgFailurePercentage = (Integer)((failedCount/this.getSizeOfOffsetMsgMap()) * 100); 
 				logger.info("% of failed message post to ElasticSearch is::" + msgFailurePercentage);
 				logger.info("ElasticSearch msg failure tolerance % is::" + this.config.esMsgFailureTolerancePercent);
