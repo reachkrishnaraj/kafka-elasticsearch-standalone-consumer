@@ -2,7 +2,7 @@
 
 ## Illustration of kafka-elasticsearch-standalone-consumer usage
 
-### The consumer is sitting in the middle.
+### The consumer is positioned in the middle.
 
 ![](https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/master/img/Kafka_ES_Illustration.png)
 
