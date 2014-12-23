@@ -4,7 +4,7 @@
 
 ### The consumer is positioned in the middle.
 
-![](https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/master/img/Kafka_ES_Illustration.png)
+![](https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/master/img/Kafka_ES_Illustration_New.png)
 
 
 # Introduction
