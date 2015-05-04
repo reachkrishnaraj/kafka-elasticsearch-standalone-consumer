@@ -9,6 +9,7 @@ import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
 import kafka.api.PartitionOffsetRequestInfo;
+import kafka.common.OffsetAndMetadata;
 import kafka.common.OffsetMetadataAndError;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
@@ -39,7 +40,7 @@ public class KafkaClient {
 	String incomingBrokerHost;
 	int inComingBrokerPort;
 	String inComingbrokerURL;
-	String clientName;
+	String kafkaGroupId;
 	String topic;
 	int partition;
 	List<String> m_replicaBrokers;
@@ -50,7 +51,8 @@ public class KafkaClient {
 	Logger logger = ConsumerLogger.getLogger(this.getClass());
 
 	
-	public KafkaClient(ConsumerConfig a_config, String a_zooKeeper, String a_brokerHost, int a_port, int a_partition, String a_clientName, String a_topic) throws Exception {
+	public KafkaClient(ConsumerConfig a_config, String a_zooKeeper, String a_brokerHost, 
+			int a_port, int a_partition, String a_kafkaGroupId, String a_topic) throws Exception {
 		logger.info("Instantiating KafkaClient");
 		this.consumerConfig = a_config;
 		
@@ -59,7 +61,7 @@ public class KafkaClient {
 		this.incomingBrokerHost = a_brokerHost;
 		this.inComingBrokerPort = a_port;
 		this.inComingbrokerURL = this.incomingBrokerHost + ":" + this.inComingBrokerPort;
-		this.clientName = a_clientName;
+		this.kafkaGroupId = a_kafkaGroupId;
 		this.partition = a_partition;
 		logger.info("### Printing out Config Value passed ###");
 		logger.info("zooKeeper::" + this.zooKeeper);
@@ -67,7 +69,7 @@ public class KafkaClient {
 		logger.info("incomingBrokerHost::" + this.incomingBrokerHost);
 		logger.info("inComingBrokerPort::" + this.inComingBrokerPort);
 		logger.info("inComingbrokerURL::" + this.inComingbrokerURL);
-		logger.info("clientName::" + this.clientName);
+		logger.info("clientName::" + this.kafkaGroupId);
 		logger.info("partition::" + this.partition);
 		m_replicaBrokers = new ArrayList<String>();
 		logger.info("Starting to connect to Zookeeper");
@@ -98,27 +100,29 @@ public class KafkaClient {
 
 	public void initConsumer() throws Exception{
 		try{
-			this.simpleConsumer = new SimpleConsumer(this.leadBrokerHost, this.leadBrokerPort, 10000, 1024 * 1024 * 10, this.clientName);
+			this.simpleConsumer = new SimpleConsumer(leadBrokerHost, leadBrokerPort, 10000, 1024 * 1024 * 10, kafkaGroupId);
 			logger.info("Succesfully initialized Kafka Consumer");
 		}
 		catch(Exception e){
-			logger.fatal("Failed to initialize Kafka Consumer. Throwing the Error. Error Message is::" + e.getMessage());
+			logger.fatal("Failed to initialize Kafka Consumer. Throwing the Error. Error Message is :: " + e.getMessage());
 			throw e;
 		}
 	}
 
 	public short saveOffsetInKafka(long offset, short errorCode) throws Exception{
-		logger.info("Starting to save the Offset value to Kafka. Offset value is::" + offset + " and errorCode passed is::" + errorCode);
+		logger.debug("Starting to save the Offset value to Kafka. Offset value is:: " + offset + " and errorCode passed is::" + errorCode);
 		short versionID = 0;
 		int correlationId = 0;
 		try{
 			TopicAndPartition tp = new TopicAndPartition(this.topic, this.partition);
-			OffsetMetadataAndError offsetMetaAndErr = new OffsetMetadataAndError(offset, OffsetMetadataAndError.NoMetadata(), errorCode);
-			Map<TopicAndPartition, OffsetMetadataAndError> mapForCommitOffset = new HashMap<TopicAndPartition, OffsetMetadataAndError>();
+			OffsetAndMetadata offsetMetaAndErr = new OffsetAndMetadata(
+					offset, OffsetAndMetadata.NoMetadata(), errorCode);
+			Map<TopicAndPartition, OffsetAndMetadata> mapForCommitOffset = new HashMap<>();
 			mapForCommitOffset.put(tp, offsetMetaAndErr);
-			kafka.javaapi.OffsetCommitRequest offsetCommitReq = new kafka.javaapi.OffsetCommitRequest(this.clientName, mapForCommitOffset, versionID, correlationId, this.clientName);
+			kafka.javaapi.OffsetCommitRequest offsetCommitReq = new kafka.javaapi.OffsetCommitRequest(
+					kafkaGroupId, mapForCommitOffset, correlationId, kafkaGroupId, versionID);
 			OffsetCommitResponse offsetCommitResp = this.simpleConsumer.commitOffsets(offsetCommitReq);
-			logger.info("Completed OffsetSet commit. OffsetCommitResponse ErrorCode is::" + offsetCommitResp.errors().get(tp)+ "Returning to the caller.");
+			logger.debug("Completed OffsetSet commit. OffsetCommitResponse ErrorCode is :: " + offsetCommitResp.errors().get(tp)+ " Returning to the caller.");
 			return (Short) offsetCommitResp.errors().get(tp);
 		}
 		catch(Exception e){
@@ -128,16 +132,21 @@ public class KafkaClient {
 	}
 	
 	public long fetchCurrentOffsetFromKafka() throws Exception{
-		logger.info("Starting to fetchCurrentOffsetFromKafka");
+		//logger.info("Starting to fetchCurrentOffsetFromKafka");
+		// versionID = 0 - fetches offsets from Zookeeper
+		// versionID = 1 and above - from KAfka (version 0.8.2.1 and above)
 		short versionID = 0;
 		int correlationId = 0;
 		try{
-			List<TopicAndPartition> tp = new ArrayList<TopicAndPartition>(); 
-			tp.add(new TopicAndPartition(this.topic, this.partition));	
-			OffsetFetchRequest offsetFetchReq = new OffsetFetchRequest(this.clientName,tp,versionID,correlationId,this.clientName);
-			OffsetFetchResponse response = this.simpleConsumer.fetchOffsets(offsetFetchReq);
-			logger.info("Completed fetchCurrentOffsetFromKafka. CurrentOffset Fetched is::" + response.offsets().get(tp.get(0)).offset());
-			return response.offsets().get(tp.get(0)).offset();
+			List<TopicAndPartition> topicPartitionList = new ArrayList<TopicAndPartition>(); 
+			TopicAndPartition myTopicAndPartition = new TopicAndPartition(topic, partition);
+			topicPartitionList.add(myTopicAndPartition);	
+			OffsetFetchRequest offsetFetchReq = new OffsetFetchRequest(
+					kafkaGroupId, topicPartitionList, versionID, correlationId, kafkaGroupId);
+			OffsetFetchResponse offsetFetchResponse = this.simpleConsumer.fetchOffsets(offsetFetchReq);
+			long currentOffset = offsetFetchResponse.offsets().get(myTopicAndPartition).offset();
+			//logger.info("Fetched Kafka's currentOffset = " + currentOffset);
+			return currentOffset;
 		}
 		catch(Exception e){
 			logger.fatal("Error when fetching current offset from kafka. Throwing the exception. Error Message is::" + e.getMessage());
@@ -188,7 +197,7 @@ public class KafkaClient {
 		this.leadBrokerHost = returnMetaData.leader().host();
 		this.leadBrokerPort = returnMetaData.leader().port();
 		this.leadBrokerURL = this.leadBrokerHost + ":" + this.leadBrokerPort;
-		logger.info("Computed leadBrokerURL is::" + this.leadBrokerURL + ", Returning.");
+		logger.info("Computed leadBrokerURL is :: " + this.leadBrokerURL + ", Returning.");
 		return returnMetaData;
 	}
 
@@ -231,35 +240,34 @@ public class KafkaClient {
 	
 	public long getLastestOffset() throws Exception {
 		Long latestOffset;
-		logger.info("Trying to get the LastestOffset for the topic: " + this.clientName);
+		logger.debug("Trying to get the LastestOffset for the topic: " + this.kafkaGroupId);
 		try{
-			latestOffset = this.getOffset(this.topic, this.partition, OffsetRequest.LatestTime(), this.clientName);
+			latestOffset = this.getOffset(this.topic, this.partition, OffsetRequest.LatestTime(), this.kafkaGroupId);
 		}
 		catch(Exception e){
 			logger.fatal("Exception when trying to get the getLastestOffset. Throwing the exception. Error is:" + e.getMessage());
 			throw e;
 		}
-		logger.info("LatestOffset is::" + latestOffset);
+		logger.debug("LatestOffset is ::" + latestOffset);
 		return latestOffset;
 		
 	}
 	
-	public long getOldestOffset() throws Exception {
-		Long oldestOffet;
-		logger.info("Trying to get the OldestOffset for the topic: " + this.topic);
+	public long getEarliestOffset() throws Exception {
+		Long earliestOffset;
+		logger.debug("Trying to get the EarliestOffset for the topic: " + this.topic);
 		try{
-			oldestOffet = this.getOffset(this.topic, this.partition, OffsetRequest.EarliestTime(), this.clientName);
+			earliestOffset = this.getOffset(this.topic, this.partition, OffsetRequest.EarliestTime(), this.kafkaGroupId);
 		}
 		catch(Exception e){
-			logger.fatal("Exception when trying to get the getOldestOffset. Throwing the exception. Error is:" + e.getMessage());
+			logger.fatal("Exception when trying to get the get EarliestOffset. Throwing the exception. Error is:" + e.getMessage());
 			throw e;
 		}
-		logger.info("oldestOffet is::" + oldestOffet);
-		return oldestOffet;
+		logger.debug("earliestOffset is :: " + earliestOffset);
+		return earliestOffset;
 	}
 	
 	private long getOffset(String topic, int partition, long whichTime, String clientName) throws Exception {
-		logger.info("Starting the generic getOffset");
 		try{
 			TopicAndPartition topicAndPartition = new TopicAndPartition(topic,
 					partition);
@@ -272,11 +280,10 @@ public class KafkaClient {
 			OffsetResponse response = this.simpleConsumer.getOffsetsBefore(request);
 
 			if (response.hasError()) {
-				logger.error("Error fetching data Offset Data the Broker. Reason: " + response.errorCode(topic, partition));
-				throw new Exception("Error fetching data Offset Data the Broker. Reason: " + response.errorCode(topic, partition));
+				logger.error("Error fetching offsets from Kafka. Reason: " + response.errorCode(topic, partition));
+				throw new Exception("Error fetching offsets from Kafka. Reason: " + response.errorCode(topic, partition));
 			}
 			long[] offsets = response.offsets(topic, partition);
-			logger.info("Offset is::" + offsets[0]);
 			return offsets[0];
 
 		}
@@ -287,15 +294,14 @@ public class KafkaClient {
 	}
 
 	FetchResponse getFetchResponse(long offset, int maxSizeBytes) throws Exception {
-		logger.info("Starting getFetchResponse");
+		logger.debug("Starting getFetchResponse");
 		try{
-			FetchRequest req = new FetchRequestBuilder().clientId(clientName).addFetch(this.topic, this.partition, offset, maxSizeBytes).build();
+			FetchRequest req = new FetchRequestBuilder().clientId(kafkaGroupId).addFetch(this.topic, this.partition, offset, maxSizeBytes).build();
 			FetchResponse fetchResponse = this.simpleConsumer.fetch(req);
-			logger.info("Fetch from Kafka exceuted without Exception. Returning with the fetchResponse");
 			return fetchResponse;
 		}
 		catch(Exception e){
-			logger.fatal("Exception when trying to fetch the messages from Kafka. Throwing the exception. Error message is::" + e.getMessage());
+			logger.fatal("Exception when trying to fetch the messages from Kafka. Throwing the exception. Error message is :: " + e.getMessage());
 			throw e;
 		}
 

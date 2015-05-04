@@ -21,9 +21,6 @@ public class RawMessageStringHandler extends MessageHandler {
 	}
 		
 	public void transformMessage() throws Exception{
-		logger.info("Starting to transformMessages into String Messages");
-		logger.info("# of message available for this round is:" + this.getOffsetMsgMap().size());
-
 		this.getEsPostObject().clear();
 		Iterator<Map.Entry<Long,Message>> offsetMsgMapItr = this.getOffsetMsgMap().entrySet().iterator();
 		while (offsetMsgMapItr.hasNext()) {
@@ -31,27 +28,24 @@ public class RawMessageStringHandler extends MessageHandler {
 			ByteBuffer payload = keyValuePair.getValue().payload();
 			byte[] bytes = new byte[payload.limit()];
 			payload.get(bytes);
+			// TODO consider using byte[] array directly - without converting to String
 			this.getEsPostObject().add(new String(bytes, "UTF-8"));
-			offsetMsgMapItr.remove();
 		}
-
-		logger.info("Completed transforming Messages into String Messages");
 	}
 	
 	public void prepareForPostToElasticSearch(){
-		logger.info("Starting prepareForPostToElasticSearch");
 		this.setBuildReqBuilder(this.getEsClient().prepareBulk());
-		logger.info("Completed constructing buildReqBuilder for ES");
 		Iterator<Object> esPostObjItr = this.getEsPostObject().iterator();
 		while(esPostObjItr.hasNext()) {
 			String eachMsg = (String) esPostObjItr.next();
-			this.getBuildReqBuilder().add(this.getEsClient().prepareIndex(this.getConfig().esIndex, this.getConfig().esIndexType).setSource((String)eachMsg));
-			esPostObjItr.remove();
+			// TODO remove all unnecessary this.xxx and get() calls - for clarity
+			this.getBuildReqBuilder().add(
+					this.getEsClient().prepareIndex(
+							this.getConfig().esIndex, this.getConfig().esIndexType)
+							.setSource((String)eachMsg)
+							);
 		}
 		this.getEsPostObject().clear();
-		//Above code will remove the message from the ArrayList and hence good for memory. Need to remove the below block of code.
-		
-		logger.info("Completed setting the messages in the buildReqBuilder for ES");
 	}
 
 }

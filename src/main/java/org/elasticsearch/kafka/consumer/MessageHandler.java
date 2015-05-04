@@ -110,17 +110,18 @@ public abstract class MessageHandler {
 			bulkResponse = this.bulkReqBuilder.execute().actionGet();
 		}
 		catch(ElasticsearchException esE){
-			logger.fatal("Failed to post the messages to ElasticSearch. Throwing the error. Error Message is::" + ExceptionHelper.getStrackTraceAsString(esE));
+			logger.fatal("Failed to post the messages to ElasticSearch. Throwing the error :: " + ExceptionHelper.getStrackTraceAsString(esE));
 			throw esE;
 		}
-		logger.info("Time took to post the bulk messages to post to ElasticSearch is::" + bulkResponse.getTookInMillis() + "milli seconds");
+		logger.info("Time took to post the bulk messages to post to ElasticSearch is :: " + bulkResponse.getTookInMillis() + "milli seconds");
 		if(bulkResponse.hasFailures()){
-			logger.error("Bulk Message Post to ElasticSearch has error. Failure message is::" + bulkResponse.buildFailureMessage());
+			logger.error("Bulk Message Post to ElasticSearch has error. Failure message is :: " + 
+					bulkResponse.buildFailureMessage());
 				int failedCount = 1;
 				Iterator<BulkItemResponse> bulkRespItr = bulkResponse.iterator();
 				while (bulkRespItr.hasNext()){
 					bulkItemResp = bulkRespItr.next();
-					bulkRespItr.remove();
+					//bulkRespItr.remove();
 					
 					if (bulkItemResp.isFailed()) {
 						//Need to handle failure messages logging in a better way
@@ -132,8 +133,13 @@ public abstract class MessageHandler {
 					
 				}
 								
+				logger.info("# of failed to post messages to ElasticSearch is :: " + failedCount);
+				// TODO log failed messages somewhere - but do not return FALSE  - to stop processing
+				// the same messages over and over
+				return true;
+				/*
 				int msgFailurePercentage = (Integer)((failedCount/this.getSizeOfOffsetMsgMap()) * 100); 
-				logger.info("% of failed message post to ElasticSearch is::" + msgFailurePercentage);
+				logger.info("% of failed message post to ElasticSearch is:: " + msgFailurePercentage);
 				logger.info("ElasticSearch msg failure tolerance % is::" + this.config.esMsgFailureTolerancePercent);
 				if(msgFailurePercentage > this.config.esMsgFailureTolerancePercent){
 					logger.error("% of failed messages is GREATER than set tolerance.Hence would return to consumer job with FALSE");
@@ -145,7 +151,7 @@ public abstract class MessageHandler {
 					this.bulkReqBuilder = null;
 					return true;
 				}
-					
+					/*  */
 				
 			}
 		logger.info("Bulk Post to ElasticSearch was success with no single error. Returning to consumer job with true.");

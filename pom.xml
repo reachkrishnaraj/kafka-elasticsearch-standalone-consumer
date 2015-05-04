@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<name>kafka-elasticsearch-standalone-consumer</name>
+	<name>kafka-es-consumer</name>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.elasticsearch.kafka.consumer</groupId>
-	<artifactId>kafka-elasticsearch-standalone-consumer</artifactId>
-	<version>0.1</version>
+	<artifactId>kafka-es-consumer</artifactId>
+	<version>0.2</version>
 	<packaging>jar</packaging>
 	<description>Kafka standalone consumer for elasticsearch</description>
 	<inceptionYear>2014</inceptionYear>
@@ -42,7 +42,7 @@
 		<dependency>
 			<groupId>org.apache.kafka</groupId>
 			<artifactId>kafka_2.10</artifactId>
-			<version>0.8.1</version>
+			<version>0.8.2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.netflix.curator</groupId>
