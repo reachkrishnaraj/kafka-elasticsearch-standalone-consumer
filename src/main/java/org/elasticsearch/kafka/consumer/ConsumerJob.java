@@ -170,7 +170,7 @@ public class ConsumerJob {
 			return;
 		}
 		logger.info("**** Starting the Kafka Read for 1st time ***");
-		logger.info("startOffsetFrom = " + consumerConfig.startOffset);
+		logger.info("startOffsetFrom = " + consumerConfig.startOffsetFrom);
 		if (consumerConfig.startOffsetFrom.equalsIgnoreCase("CUSTOM")) {
 			if (consumerConfig.startOffset != -1) {
 				this.offsetForThisRound = consumerConfig.startOffset;
@@ -354,15 +354,16 @@ public class ConsumerJob {
 			logger.info("The ES Post is success and this is not a dry run and hence commiting the offset to Kafka");
 		}
 		logger.info("Commiting offset #:: " + this.nextOffsetToProcess);
+		// TODO optimize getting of the fetchResponse.errorCode - in some places there isno error, 
+		// so no need to call the API every time
 		try {
 			this.kafkaConsumerClient.saveOffsetInKafka(
 					this.nextOffsetToProcess, fetchResponse.errorCode(
 							this.consumerConfig.topic,
 							this.consumerConfig.partition));
 		} catch (Exception e) {
-			logger.fatal("Failed to commit the Offset in Kafka after processing and posting to ES. The error stacktrace is below:");
-			logger.fatal(ExceptionHelper.getStrackTraceAsString(e));
-			logger.info("Trying to reInitialize Kafka and again try commiting the offset");
+			logger.fatal("Failed to commit the Offset in Kafka after processing and posting to ES: ", e);
+			logger.info("Trying to reInitialize Kafka and commit the offset again...");
 			this.reInitKakfa();
 			try {
 				logger.info("Attempting to commit the offset after reInitializing Kafka now..");
@@ -376,11 +377,6 @@ public class ConsumerJob {
 				// reInitializing kafka.
 				logger.fatal("Failed to commit the Offset in Kafka even after reInitializing Kafka.");
 			}
-		}
-
-		if (this.isStartingFirstTime) {
-			logger.debug("Yes, this is the first round of the job. Since the very 1st complete cycle is successfull, moving to next round and making the 'isStartingFirstTime' as false");
-			this.isStartingFirstTime = false;
 		}
 
 		long timeAtEndOfJob = System.currentTimeMillis();
