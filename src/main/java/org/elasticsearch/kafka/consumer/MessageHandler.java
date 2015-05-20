@@ -1,8 +1,8 @@
 package org.elasticsearch.kafka.consumer;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
+
+import kafka.message.MessageAndOffset;
 
 import org.apache.log4j.Logger;
 import org.elasticsearch.ElasticsearchException;
@@ -10,21 +10,14 @@ import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.client.Client;
-import org.elasticsearch.kafka.consumer.helpers.ExceptionHelper;
-
-import kafka.message.Message;
 
 
 public abstract class MessageHandler {
 
 	private Client esClient;
-	private LinkedHashMap<Long, Message> offsetMsgMap;
 	private ConsumerConfig config;
 	private BulkRequestBuilder bulkReqBuilder;
-	private ArrayList<Object> esPostObject= new ArrayList<Object>();
-	private LinkedHashMap<Long, Object> offsetFailedMsgMap = new LinkedHashMap<Long, Object>();
 	Logger logger = ConsumerLogger.getLogger(this.getClass());
-	protected int sizeOfOffsetMsgMap;
 		
 	public MessageHandler(){
 	}
@@ -35,34 +28,6 @@ public abstract class MessageHandler {
 
 	public void setEsClient(Client esClient) {
 		this.esClient = esClient;
-	}
-
-	/*public void initMessageHandler(){
-		this.esPostObject= new ArrayList<Object>();
-		this.offsetMsgMap = new LinkedHashMap<Long, Message>();
-		this.bulkReqBuilder = null;
-		logger.info("Initialized Message Handler");
-		
-	}*/
-	
-	public LinkedHashMap<Long, Message> getOffsetMsgMap() {
-		return offsetMsgMap;
-	}
-
-	public int getSizeOfOffsetMsgMap() {
-		return sizeOfOffsetMsgMap;
-	}
-
-	public void setOffsetMsgMap(LinkedHashMap<Long, Message> offsetMsgMap) {
-		this.offsetMsgMap = offsetMsgMap;
-	}
-	
-	public LinkedHashMap<Long, Object> getOffsetFailedMsgMap() {
-		return offsetFailedMsgMap;
-	}
-
-	public void setOffsetFailedMsgMap(LinkedHashMap<Long, Object> offsetFailedMsgMap) {
-		this.offsetFailedMsgMap = offsetFailedMsgMap;
 	}
 
 	public ConsumerConfig getConfig() {
@@ -81,19 +46,9 @@ public abstract class MessageHandler {
 		this.bulkReqBuilder = bulkReqBuilder;
 	}
 	
-	public ArrayList<Object> getEsPostObject() {
-		return esPostObject;
-	}
-
-	public void setEsPostObject(ArrayList<Object> esPostObject) {
-		this.esPostObject = esPostObject;
-	}
-
 	public void initMessageHandler(Client client,ConsumerConfig config){
 		this.esClient = client;
 		this.config = config;
-		this.esPostObject= new ArrayList<Object>();
-		this.offsetMsgMap = new LinkedHashMap<Long, Message>();
 		this.bulkReqBuilder = null;
 		logger.info("Initialized Message Handler");
 	}
@@ -109,27 +64,25 @@ public abstract class MessageHandler {
 		try{
 			bulkResponse = this.bulkReqBuilder.execute().actionGet();
 		}
-		catch(ElasticsearchException esE){
-			logger.fatal("Failed to post the messages to ElasticSearch. Throwing the error :: " + ExceptionHelper.getStrackTraceAsString(esE));
-			throw esE;
+		catch(ElasticsearchException e){
+			logger.fatal("Failed to post the messages to ElasticSearch. Throwing the error :: " + e.getMessage(), e);
+			throw e;
 		}
-		logger.info("Time took to post the bulk messages to post to ElasticSearch is :: " + bulkResponse.getTookInMillis() + "milli seconds");
+		logger.info("Time took to post the bulk messages to post to ElasticSearch [ms] :: " + bulkResponse.getTookInMillis());
 		if(bulkResponse.hasFailures()){
-			logger.error("Bulk Message Post to ElasticSearch has error. Failure message is :: " + 
+			logger.error("Bulk Message Post to ElasticSearch has errors. Failure message is :: " + 
 					bulkResponse.buildFailureMessage());
 				int failedCount = 1;
 				Iterator<BulkItemResponse> bulkRespItr = bulkResponse.iterator();
 				while (bulkRespItr.hasNext()){
 					bulkItemResp = bulkRespItr.next();
-					//bulkRespItr.remove();
-					
 					if (bulkItemResp.isFailed()) {
 						//Need to handle failure messages logging in a better way
-						logger.info("Failed Message # " + failedCount + " is::" + bulkItemResp.getFailure().getMessage());
+						logger.error("Failed Message # " + failedCount + " is::" + bulkItemResp.getFailure().getMessage());
 						failedCount++;
-						} else {
+					} else {
 							//Do stats handling here
-						}
+					}
 					
 				}
 								
@@ -159,9 +112,10 @@ public abstract class MessageHandler {
 		return true;
 	}
 
-	public abstract void transformMessage() throws Exception;
+	public abstract byte[] transformMessage(byte[] inputMessage, Long offset) throws Exception;
 	
-	public abstract void prepareForPostToElasticSearch() throws Exception;
+	public abstract long prepareForPostToElasticSearch(
+		Iterator<MessageAndOffset> messageAndOffsetIterator) throws Exception;
 
 	
 }

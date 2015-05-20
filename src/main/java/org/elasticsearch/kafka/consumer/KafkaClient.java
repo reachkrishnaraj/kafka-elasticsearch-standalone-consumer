@@ -10,7 +10,6 @@ import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.OffsetAndMetadata;
-import kafka.common.OffsetMetadataAndError;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetCommitResponse;
@@ -24,7 +23,6 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 
 import org.apache.log4j.Logger;
-import org.apache.zookeeper.CreateMode;
 
 import com.netflix.curator.framework.CuratorFramework;
 import com.netflix.curator.framework.CuratorFrameworkFactory;
@@ -130,30 +128,7 @@ public class KafkaClient {
 			throw e;
 		}
 	}
-	
-	public long fetchCurrentOffsetFromKafka() throws Exception{
-		//logger.info("Starting to fetchCurrentOffsetFromKafka");
-		// versionID = 0 - fetches offsets from Zookeeper
-		// versionID = 1 and above - from KAfka (version 0.8.2.1 and above)
-		short versionID = 0;
-		int correlationId = 0;
-		try{
-			List<TopicAndPartition> topicPartitionList = new ArrayList<TopicAndPartition>(); 
-			TopicAndPartition myTopicAndPartition = new TopicAndPartition(topic, partition);
-			topicPartitionList.add(myTopicAndPartition);	
-			OffsetFetchRequest offsetFetchReq = new OffsetFetchRequest(
-					kafkaGroupId, topicPartitionList, versionID, correlationId, kafkaGroupId);
-			OffsetFetchResponse offsetFetchResponse = this.simpleConsumer.fetchOffsets(offsetFetchReq);
-			long currentOffset = offsetFetchResponse.offsets().get(myTopicAndPartition).offset();
-			//logger.info("Fetched Kafka's currentOffset = " + currentOffset);
-			return currentOffset;
-		}
-		catch(Exception e){
-			logger.fatal("Error when fetching current offset from kafka. Throwing the exception. Error Message is::" + e.getMessage());
-			throw e;
-		}
-	}
-	
+		
 	private PartitionMetadata findLeader() throws Exception {
 		logger.info("Starting to find the leader broker for Kafka");
 		PartitionMetadata returnMetaData = null;
@@ -292,16 +267,43 @@ public class KafkaClient {
 		throw e;
 	}
 	}
-
-	FetchResponse getFetchResponse(long offset, int maxSizeBytes) throws Exception {
-		logger.debug("Starting getFetchResponse");
+	
+	public long fetchCurrentOffsetFromKafka() throws Exception{
+		//logger.info("Starting to fetchCurrentOffsetFromKafka");
+		// versionID = 0 - fetches offsets from Zookeeper
+		// versionID = 1 and above - from KAfka (version 0.8.2.1 and above)
+		short versionID = 0;
+		int correlationId = 0;
 		try{
-			FetchRequest req = new FetchRequestBuilder().clientId(kafkaGroupId).addFetch(this.topic, this.partition, offset, maxSizeBytes).build();
+			List<TopicAndPartition> topicPartitionList = new ArrayList<TopicAndPartition>(); 
+			TopicAndPartition myTopicAndPartition = new TopicAndPartition(topic, partition);
+			topicPartitionList.add(myTopicAndPartition);	
+			OffsetFetchRequest offsetFetchReq = new OffsetFetchRequest(
+					kafkaGroupId, topicPartitionList, versionID, correlationId, kafkaGroupId);
+			OffsetFetchResponse offsetFetchResponse = this.simpleConsumer.fetchOffsets(offsetFetchReq);
+			long currentOffset = offsetFetchResponse.offsets().get(myTopicAndPartition).offset();
+			//logger.info("Fetched Kafka's currentOffset = " + currentOffset);
+			return currentOffset;
+		}
+		catch(Exception e){
+			logger.fatal("Error when fetching current offset from kafka. Throwing the exception. Error Message is::" + e.getMessage());
+			throw e;
+		}
+	}
+
+
+	FetchResponse getMessagesFromKafka(long offset, int maxSizeBytes) throws Exception {
+		logger.debug("Starting getMessagesFromKafka() ...");
+		try{
+			FetchRequest req = new FetchRequestBuilder()
+				.clientId(kafkaGroupId)
+				.addFetch(this.topic, this.partition, offset, maxSizeBytes)
+				.build();
 			FetchResponse fetchResponse = this.simpleConsumer.fetch(req);
 			return fetchResponse;
 		}
 		catch(Exception e){
-			logger.fatal("Exception when trying to fetch the messages from Kafka. Throwing the exception. Error message is :: " + e.getMessage());
+			logger.fatal("Exception fetching messages from Kafka: " + e.getMessage(), e);
 			throw e;
 		}
 

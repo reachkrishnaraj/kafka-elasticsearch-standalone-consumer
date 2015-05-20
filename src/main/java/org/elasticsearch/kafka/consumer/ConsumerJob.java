@@ -1,14 +1,8 @@
 package org.elasticsearch.kafka.consumer;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-
 import kafka.common.ErrorMapping;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
-import kafka.message.Message;
-import kafka.message.MessageAndOffset;
 
 import org.apache.log4j.Logger;
 import org.elasticsearch.ElasticsearchException;
@@ -17,7 +11,6 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
-import org.elasticsearch.kafka.consumer.helpers.ExceptionHelper;
 
 public class ConsumerJob {
 
@@ -26,14 +19,9 @@ public class ConsumerJob {
 	private MessageHandler msgHandler;
 	private Client esClient;
 	public KafkaClient kafkaConsumerClient;
-	private Long currentOffsetAtProcess;
 	private Long nextOffsetToProcess;
-	// StatsReporter statsd;
-	// private long statsLastPrintTime;
-	// private Stats stats = new Stats();
 	private boolean isStartingFirstTime;
 	private String consumerGroupTopicPartition;
-	private LinkedHashMap<Long, Message> offsetMsgMap = new LinkedHashMap<Long, Message>();
 	private ByteBufferMessageSet byteBufferMsgSet = null;
 	private FetchResponse fetchResponse = null;
 
@@ -41,14 +29,6 @@ public class ConsumerJob {
 
 	private int kafkaIntSleepTime = 60000;
 	private int esIntSleepTime = 60000;
-
-	public LinkedHashMap<Long, Message> getOffsetMsgMap() {
-		return offsetMsgMap;
-	}
-
-	public void setOffsetMsgMap(LinkedHashMap<Long, Message> offsetMsgMap) {
-		this.offsetMsgMap = offsetMsgMap;
-	}
 
 	public ConsumerJob(ConsumerConfig config) throws Exception {
 		this.consumerConfig = config;
@@ -79,10 +59,6 @@ public class ConsumerJob {
 										.parseInt(eachHostPort.split(":")[1]
 												.trim())));
 			}
-			// this.esClient = new
-			// TransportClient(settings).addTransportAddress(new
-			// InetSocketTransportAddress(this.consumerConfig.esHost,
-			// this.consumerConfig.esPort));
 			logger.info("Initializing ElasticSearch Success. ElasticSearch Client created and intialized.");
 		} catch (Exception e) {
 			logger.fatal("Exception when trying to connect and create ElasticSearch Client. Throwing the error. Error Message is::"
@@ -109,7 +85,6 @@ public class ConsumerJob {
 				consumerConfig.brokerPort, consumerConfig.partition,
 				consumerGroupName, consumerConfig.topic);
 		logger.info("Kafka intialization success and kafka client created and intialized");
-
 	}
 
 	void reInitKakfa() throws Exception {
@@ -140,40 +115,26 @@ public class ConsumerJob {
 
 	public void checkKafkaOffsets() {
 		try {
-			long currentOffset = kafkaConsumerClient
-					.fetchCurrentOffsetFromKafka();
+			long currentOffset = kafkaConsumerClient.fetchCurrentOffsetFromKafka();
 			long earliestOffset = kafkaConsumerClient.getEarliestOffset();
 			long latestOffset = kafkaConsumerClient.getLastestOffset();
 			logger.info("Kafka offsets: currentOffset=" + currentOffset
 					+ "; earliestOffset=" + earliestOffset + "; latestOffset="
 					+ latestOffset);
 		} catch (Exception e) {
-			logger.warn(
-					"Exception from checkKafkaOffsets(): " + e.getMessage(), e);
+			logger.warn("Exception from checkKafkaOffsets(): " + e.getMessage(), e);
 			e.printStackTrace();
 		}
 
 	}
 
-	void computeOffset() throws Exception {
-		if (!isStartingFirstTime) {
-			//logger.info("This is not 1st time read in Kafka");
-			offsetForThisRound = kafkaConsumerClient.fetchCurrentOffsetFromKafka();
-			if (offsetForThisRound == -1)
-			{
-				throw new Exception(
-						"current offset for this run is -1 which indicates some state corruption; " +
-						" verify expected offset for this topic and restart the app with the CUSTOM offset value; exiting");
-			} else {
-				logger.info("offsetForThisRound is set to the CurrentOffset: " + offsetForThisRound);				
-			}
-			return;
-		}
-		logger.info("**** Starting the Kafka Read for 1st time ***");
+	private void computeOffset() throws Exception {
+		
+		logger.info("**** Computing Kafka offset ***");
 		logger.info("startOffsetFrom = " + consumerConfig.startOffsetFrom);
 		if (consumerConfig.startOffsetFrom.equalsIgnoreCase("CUSTOM")) {
 			if (consumerConfig.startOffset != -1) {
-				this.offsetForThisRound = consumerConfig.startOffset;
+				offsetForThisRound = consumerConfig.startOffset;
 			} else {
 				throw new Exception(
 					"Custom start offset for " + consumerGroupTopicPartition
@@ -182,17 +143,17 @@ public class ConsumerJob {
 		} else if (consumerConfig.startOffsetFrom.equalsIgnoreCase("OLDEST")) {
 			this.offsetForThisRound = kafkaConsumerClient.getEarliestOffset();
 		} else if (consumerConfig.startOffsetFrom.equalsIgnoreCase("LATEST")) {
-			this.offsetForThisRound = kafkaConsumerClient.getLastestOffset();
+			offsetForThisRound = kafkaConsumerClient.getLastestOffset();
 		} else if (consumerConfig.startOffsetFrom.equalsIgnoreCase("RESTART")) {
-			logger.info("ReStarting from where the Offset is left for consumer:"
-					+ this.consumerGroupTopicPartition);
+			logger.info("ReStarting from where the Offset is left for consumer: "
+					+ consumerGroupTopicPartition);
 			offsetForThisRound = kafkaConsumerClient.fetchCurrentOffsetFromKafka();
 			if (offsetForThisRound == -1)
 			{
 				// if this is the first time this client tried to read - offset might be -1
 				// [ TODO figure out all cases when this can happen]
 				// try to get the Earliest offset and read from there - it may lead
-				// to processing events that may have already be proccesed - but it is safer than
+				// to processing events that may have already be processed - but it is safer than
 				// starting from the Latest offset in case not all events were processed before				
 				offsetForThisRound = kafkaConsumerClient.getEarliestOffset();
 				logger.info("offsetForThisRound is set to the EarliestOffset since currentOffset is -1; offsetForThisRound=" + offsetForThisRound);
@@ -210,20 +171,34 @@ public class ConsumerJob {
 				logger.info("offsetForThisRound is set to the CurrentOffset: " + offsetForThisRound);				
 			}
 		}
+		long earliestOffset = kafkaConsumerClient.getEarliestOffset();
+		// check for a corner case when the computed offset (either current or custom)
+		// is less than the Earliest offset - which could happen if some messages were 
+		// cleaned up from the topic/partition due to retention policy
+		if (offsetForThisRound < earliestOffset){
+			logger.warn("WARNING: computed offset (either current or custom) = " + offsetForThisRound +
+					" is less than EarliestOffset = " + earliestOffset + 
+					"; setting offsetForThisRound to the EarliestOffset");
+			offsetForThisRound = earliestOffset;
+			try {
+				kafkaConsumerClient.saveOffsetInKafka( offsetForThisRound, ErrorMapping.NoError());
+			} catch (Exception e) {
+				logger.fatal("Failed to commit the offset in Kafka, exiting: " + e.getMessage(), e);
+				throw new Exception("Failed to commit the offset in Kafka, exiting: " + e.getMessage(), e);
+			}
+		}
 		logger.info("Resulting offsetForThisRound = " + offsetForThisRound);
-		// System.out.println("offsetForThisRound:=" + this.offsetForThisRound);
 	}
 
 	private void createMessageHandler() throws Exception {
 		try {
 			logger.info("MessageHandler Class given in config is:"
 					+ this.consumerConfig.messageHandlerClass);
-			this.msgHandler = (MessageHandler) Class.forName(
+			msgHandler = (MessageHandler) Class.forName(
 					this.consumerConfig.messageHandlerClass).newInstance();
-			this.msgHandler.initMessageHandler(this.esClient,
-					this.consumerConfig);
-			logger.info("Created an initialized MessageHandle::"
-					+ this.consumerConfig.messageHandlerClass);
+			msgHandler.initMessageHandler(esClient, consumerConfig);
+			logger.debug("Created and initialized MessageHandler: "
+					+ consumerConfig.messageHandlerClass);
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw e;
@@ -234,28 +209,31 @@ public class ConsumerJob {
 	public void doRun() throws Exception {
 		long jobStartTime = System.currentTimeMillis();
 		boolean esPostResult = false;
-		offsetMsgMap.clear();
 		this.checkKafkaOffsets();
-		// TODO fix exception handling - do not re-init Kafka and ES forever - limit to some max # times
-		try {
-			computeOffset();
-		} catch (Exception e) {
-			logger.error("Exception computing getting Kafka offsets - exiting: ", e);
-			// do not re-init Kafka here for now - re-introduce this once limited number of tries
-			// is implemented - and when it will be clear that re-init-ing of KAfka actually worked
-			// reInitKakfa();
-			throw e;
-		}
-		// mark this as not first time startup anymore - since we already saved correct offset
-		// to Kafka, and to avoid going through the logic of figuring out the initial offset
-		// every round if it so happens that there were no events from Kafka for a long time
-		if (isStartingFirstTime) {
-			logger.debug("setting 'isStartingFirstTime' to false");
+		if (!isStartingFirstTime) {
+			// do not read offset from Kafka after each run - we just stored it there
+			// If this is the only thread that is processing data from this partition - 
+			// we can rely on the in-memory nextOffsetToProcess variable
+			offsetForThisRound = nextOffsetToProcess;
+		} else {
+			// if this is the first time we run the Consumer - get it from Kafka
+			try {
+				computeOffset();
+			} catch (Exception e) {
+				logger.error("Exception getting Kafka offsets - exiting: ", e);
+				// do not re-init Kafka here for now - re-introduce this once limited number of tries
+				// is implemented - and when it will be clear that re-init-ing of KAfka actually worked
+				// reInitKakfa();
+				throw e;
+			}
+			// mark this as not first time startup anymore - since we already saved correct offset
+			// to Kafka, and to avoid going through the logic of figuring out the initial offset
+			// every round if it so happens that there were no events from Kafka for a long time
 			isStartingFirstTime = false;
+			nextOffsetToProcess = offsetForThisRound;
 		}
 
-		fetchResponse = kafkaConsumerClient.getFetchResponse(
-				offsetForThisRound, consumerConfig.bulkSize);
+		fetchResponse = kafkaConsumerClient.getMessagesFromKafka( offsetForThisRound, consumerConfig.bulkSize);
 		long timeAfterKafaFetch = System.currentTimeMillis();
 		logger.info("Fetched the reponse from Kafka. Approx time taken is :: "
 				+ (timeAfterKafaFetch - jobStartTime) + " milliSec");
@@ -284,48 +262,22 @@ public class ConsumerJob {
 						latestOffset, 
 						fetchResponse.errorCode(consumerConfig.topic, consumerConfig.partition));
 				} catch (Exception e) {
-					// TODO need to handle this exception better
-					logger.fatal("Failed to commit the offset in Kafka  - will try later: " + e.getMessage(), e);
+					// throw an exception as this will break reading messages in the next round
+					logger.fatal("Failed to commit the offset in Kafka - exiting: " + e.getMessage(), e);
+					throw e;
 				}
 			}
 			return;
 		}
-		// TODO do not create a second map [offset -> MessageAndOffset]
-		// the info is available in the MEssageAndOffset objects anyway, and no
-		// need to do all this crazy copying/removing from iterators.....
-		Iterator<MessageAndOffset> msgOffSetIter = byteBufferMsgSet.iterator();
-		while (msgOffSetIter.hasNext()) {
-			MessageAndOffset msgAndOffset = msgOffSetIter.next();
-			this.currentOffsetAtProcess = msgAndOffset.offset();
-			this.nextOffsetToProcess = msgAndOffset.nextOffset();
-			offsetMsgMap.put(currentOffsetAtProcess, msgAndOffset.message());
-			// msgOffSetIter.remove();
-		}
-		long timeAftKafkaMsgCollate = System.currentTimeMillis();
-		logger.debug("Completed collating the Messages and Offset into Map. Approx time taken is::"
-				+ (timeAftKafkaMsgCollate - timeAftKafaFetchMsgSet)
-				+ " milliSec");
-		// this.msgHandler.initMessageHandler();
-		// logger.info("Initialized Message handler");
-		msgHandler.setOffsetMsgMap(offsetMsgMap);
-		System.out.println("# of message available for this round is:"
-				+ offsetMsgMap.size());
-		logger.info("# of message available for this round is:"
-				+ offsetMsgMap.size());
-		logger.info("Starting to transform the messages");
-		msgHandler.transformMessage();
-		logger.info("# of messages which failed during transforming:: "
-				+ this.msgHandler.getOffsetFailedMsgMap().size());
-		logger.info("Completed transforming messages");
-		//TODO consolidate transformMEssages and prepareToPost....()
 		logger.info("Starting to prepare ElasticSearch");
-		msgHandler.prepareForPostToElasticSearch();
+		nextOffsetToProcess = msgHandler.prepareForPostToElasticSearch(byteBufferMsgSet.iterator());
+		
 		long timeAtPrepareES = System.currentTimeMillis();
-		logger.debug("Completed preparing ElasticSearch.Approx time taken to initMsg,TransformMsg,Prepare ES is::"
-				+ (timeAtPrepareES - timeAftKafkaMsgCollate) + " milliSec");
-		logger.debug("nextOffsetToProcess is:: "
-				+ nextOffsetToProcess
-				+ " This is the offset that will be commited once elasticSearch post is complete");
+		//logger.debug("Completed preparing ElasticSearch.Approx time taken to initMsg,TransformMsg,Prepare ES is::"
+		//		+ (timeAtPrepareES - timeAftKafkaMsgCollate) + " milliSec");
+		//logger.debug("nextOffsetToProcess is:: "
+		//		+ nextOffsetToProcess
+		//		+ " This is the offset that will be committed once elasticSearch post is complete");
 
 		if (Boolean.parseBoolean(this.consumerConfig.isDryRun.trim())) {
 			logger.info("**** This is a dry run, hence NOT committing the offset in Kafka ****");
@@ -333,11 +285,11 @@ public class ConsumerJob {
 		}
 		try {
 			logger.info("posting the messages to ElasticSearch");
-			esPostResult = this.msgHandler.postToElasticSearch();
+			esPostResult = msgHandler.postToElasticSearch();
 		} catch (ElasticsearchException esE) {
 			logger.fatal("ElasticsearchException exception happened. Detailed Message is:: "
 					+ esE.getDetailedMessage());
-			logger.fatal("Root Cause::" + esE.getRootCause());
+			logger.fatal("Root Cause:: " + esE.getRootCause());
 			logger.info("Will try reinitializing ElasticSearch now");
 			this.reInitElasticSearch();
 			logger.info("Tried reinitializing ElasticSearch, returning back");
@@ -354,13 +306,13 @@ public class ConsumerJob {
 			logger.info("The ES Post is success and this is not a dry run and hence commiting the offset to Kafka");
 		}
 		logger.info("Commiting offset #:: " + this.nextOffsetToProcess);
-		// TODO optimize getting of the fetchResponse.errorCode - in some places there isno error, 
+		// TODO optimize getting of the fetchResponse.errorCode - in some cases there is no error, 
 		// so no need to call the API every time
 		try {
 			this.kafkaConsumerClient.saveOffsetInKafka(
-					this.nextOffsetToProcess, fetchResponse.errorCode(
-							this.consumerConfig.topic,
-							this.consumerConfig.partition));
+				this.nextOffsetToProcess, fetchResponse.errorCode(
+					this.consumerConfig.topic,
+					this.consumerConfig.partition));
 		} catch (Exception e) {
 			logger.fatal("Failed to commit the Offset in Kafka after processing and posting to ES: ", e);
 			logger.info("Trying to reInitialize Kafka and commit the offset again...");
@@ -368,14 +320,20 @@ public class ConsumerJob {
 			try {
 				logger.info("Attempting to commit the offset after reInitializing Kafka now..");
 				this.kafkaConsumerClient.saveOffsetInKafka(
-						this.nextOffsetToProcess, fetchResponse.errorCode(
-								this.consumerConfig.topic,
-								this.consumerConfig.partition));
-			} catch (Exception exc) {
+					this.nextOffsetToProcess, fetchResponse.errorCode(
+						this.consumerConfig.topic,
+						this.consumerConfig.partition));
+			} catch (Exception e2) {
 				// KrishnaRaj - Need to handle this situation where
 				// committing offset back to Kafka is failing even after
 				// reInitializing kafka.
-				logger.fatal("Failed to commit the Offset in Kafka even after reInitializing Kafka.");
+				logger.fatal("Failed to commit the Offset in Kafka even after reInitializing Kafka - exiting: " +
+				 e2.getMessage(), e2);
+				// there is no point in continuing  - as we will keep re-processing events
+				// from the old offset. Throw an exception and exit;
+				// manually fix KAfka/Zookeeper env and re-start from a 
+				// desired , possibly custom, offset
+				throw e2;
 			}
 		}
 
@@ -383,7 +341,7 @@ public class ConsumerJob {
 		logger.info("*** This round of ConsumerJob took approx:: "
 				+ (timeAtEndOfJob - jobStartTime) + " milliSec."
 				+ "Messages from Offset:" + this.offsetForThisRound + " to "
-				+ this.currentOffsetAtProcess
+				+ this.nextOffsetToProcess
 				+ " were processed in this round. ****");
 		this.byteBufferMsgSet.buffer().clear();
 		this.byteBufferMsgSet = null;

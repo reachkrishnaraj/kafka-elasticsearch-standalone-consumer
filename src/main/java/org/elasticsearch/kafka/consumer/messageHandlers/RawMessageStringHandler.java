@@ -2,12 +2,11 @@ package org.elasticsearch.kafka.consumer.messageHandlers;
 
 import java.nio.ByteBuffer;
 import java.util.Iterator;
-import java.util.Map;
 
 import kafka.message.Message;
+import kafka.message.MessageAndOffset;
 
 import org.apache.log4j.Logger;
-import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.kafka.consumer.ConsumerLogger;
 import org.elasticsearch.kafka.consumer.MessageHandler;
 
@@ -19,33 +18,51 @@ public class RawMessageStringHandler extends MessageHandler {
 		super();
 		logger.info("Initialized RawMessageStringHandler");
 	}
-		
-	public void transformMessage() throws Exception{
-		this.getEsPostObject().clear();
-		Iterator<Map.Entry<Long,Message>> offsetMsgMapItr = this.getOffsetMsgMap().entrySet().iterator();
-		while (offsetMsgMapItr.hasNext()) {
-			Map.Entry<Long,Message> keyValuePair = (Map.Entry<Long,Message>)offsetMsgMapItr.next();
-			ByteBuffer payload = keyValuePair.getValue().payload();
-			byte[] bytes = new byte[payload.limit()];
-			payload.get(bytes);
-			// TODO consider using byte[] array directly - without converting to String
-			this.getEsPostObject().add(new String(bytes, "UTF-8"));
+	
+	public long prepareForPostToElasticSearch(Iterator<MessageAndOffset> messageAndOffsetIterator){
+		this.setBuildReqBuilder(this.getEsClient().prepareBulk());
+		int numProcessedMessages = 0;
+		int numMessagesInBatch = 0;
+		long offsetOfNextBatch = 0;
+		while(messageAndOffsetIterator.hasNext()) {
+			numMessagesInBatch++;
+			MessageAndOffset messageAndOffset = messageAndOffsetIterator.next();
+			offsetOfNextBatch = messageAndOffset.nextOffset();
+			Message message = messageAndOffset.message();
+			ByteBuffer payload = message.payload();
+			byte[] bytesMessage = new byte[payload.limit()];
+			payload.get(bytesMessage);
+			byte[] transformedMessage;
+			try {
+				transformedMessage = this.transformMessage(bytesMessage, messageAndOffset.offset());
+			} catch (Exception e) {
+				// TODO decide whether you want to fail the whole batch if transformation 
+				// of one message fails, or if you just want to log this message into failedEvents.log
+				// for later re-processing
+				// for now - just log and continue
+				logger.error("ERROR transforming message at offset=" +  messageAndOffset.offset() + 
+						" - skipping it: " + bytesMessage, e);
+				continue;
+			}
+			this.getBuildReqBuilder().add(
+				this.getEsClient().prepareIndex(
+					this.getConfig().esIndex, this.getConfig().esIndexType)
+					.setSource(transformedMessage)
+			);
+			numProcessedMessages++;
 		}
+		logger.info("Total # of messages in this batch: " + numMessagesInBatch + 
+				"; # of successfully transformed and added to Index messages: " + numProcessedMessages + 
+				"; offsetOfNextBatch=" + offsetOfNextBatch);
+		return offsetOfNextBatch;
 	}
 	
-	public void prepareForPostToElasticSearch(){
-		this.setBuildReqBuilder(this.getEsClient().prepareBulk());
-		Iterator<Object> esPostObjItr = this.getEsPostObject().iterator();
-		while(esPostObjItr.hasNext()) {
-			String eachMsg = (String) esPostObjItr.next();
-			// TODO remove all unnecessary this.xxx and get() calls - for clarity
-			this.getBuildReqBuilder().add(
-					this.getEsClient().prepareIndex(
-							this.getConfig().esIndex, this.getConfig().esIndexType)
-							.setSource((String)eachMsg)
-							);
-		}
-		this.getEsPostObject().clear();
+	public byte[] transformMessage( byte[] inputMessage, Long offset) throws Exception{
+		byte[] outputMessage;
+		// do necessary transformation here
+		// in the simplest case - post as is
+		outputMessage = inputMessage;		
+		return outputMessage; 		
 	}
 
 }
