@@ -1,32 +1,28 @@
 package org.elasticsearch.kafka.consumer.daemon;
 
-import org.apache.log4j.Logger;
 import org.elasticsearch.kafka.consumer.ConsumerConfig;
 import org.elasticsearch.kafka.consumer.ConsumerJob;
-import org.elasticsearch.kafka.consumer.ConsumerLogger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class KafkaConsumerMain {
 	
 	private boolean stopped = false;
 	public ConsumerJob kafkaConsumerJob = null;
 	private boolean isConsumeJobInProgress = false;
-	private Logger logger;
 	private ConsumerConfig kafkaConsumerConfig;
+	private static final Logger logger = LoggerFactory.getLogger(KafkaConsumerMain.class);
 	
 	public KafkaConsumerMain(){		
 	}
 	
     public void init(String[] args) throws Exception {
-		System.out.println("Initializing the Kafka Consumer config, arguments passed to the Driver: ");
+		logger.info("Initializing the Kafka Consumer config, arguments passed to the Driver: ");
 		for(String arg : args){
-			System.out.println(arg);
-		}
-		
+			logger.info(arg);
+		}		
 		kafkaConsumerConfig = new ConsumerConfig(args[0]);
-		ConsumerLogger.doInitLogger(kafkaConsumerConfig);
-		logger = ConsumerLogger.getLogger(this.getClass());
 		logger.info("Created the kafka consumer config, about to create a new Kafka Consumer Job");
-		System.out.println("Created the kafka consumer config, about to create a new Kafka Consumer Job");
 		kafkaConsumerJob = new ConsumerJob(kafkaConsumerConfig);		
     }
 	
@@ -48,6 +44,7 @@ public class KafkaConsumerMain {
         		Thread.sleep(kafkaConsumerConfig.consumerSleepTime * 1000);
         		logger.debug("Completed a round of kafka consumer job");
         	} catch (InterruptedException e) {
+        		isConsumeJobInProgress = false;
         		this.stop();
         	} catch(Exception e){
         		isConsumeJobInProgress = false;
@@ -64,10 +61,9 @@ public class KafkaConsumerMain {
 	
     public void stop() throws Exception {
 		logger.info("Received the stop signal, trying to stop the Consumer job");
-		System.out.println("Received the stop signal, trying to stop the Consumer job");
 		stopped = true;
         while(isConsumeJobInProgress){
-        	this.logger.info(".... Waiting for inprogress Consumer Job to complete ...");
+        	logger.info(".... Waiting for inprogress Consumer Job to complete ...");
         	Thread.sleep(1000);
         }
         logger.info("Completed waiting for inprogess Consumer Job to finish - stopping the job");
@@ -75,23 +71,35 @@ public class KafkaConsumerMain {
         	kafkaConsumerJob.stop();
         }
         catch(Exception e){
-        	System.out.println("********** Exception when trying to stop the Consumer Job: " + 
-        			e.getMessage());
+        	logger.error("********** Exception when trying to stop the Consumer Job: " + 
+        			e.getMessage(), e);
 			e.printStackTrace();
         }
         logger.info("Stopped the Consumer Job");
-        System.out.println("Stopped the Consumer Job");
-        
     }
 	
     public static void main(String[] args) {
     	KafkaConsumerMain driver = new KafkaConsumerMain();
+
+    	Runtime.getRuntime().addShutdownHook(new Thread() {
+  	      public void run() {
+  	        System.out.println("Running Shutdown Hook .... ");
+  	        try {
+					driver.stop();
+				} catch (Exception e) {
+					System.out.println("Error stopping the Consumer from the ShutdownHook: " + e.getMessage());
+					e.printStackTrace();
+				}
+  	      }
+  	   });
+
     	try {
 			driver.init(args);
 			driver.start();
 		} catch (Exception e) {
 			System.out.println("Exception from main() - exiting: " + e.getMessage());
 		}
+    	
     	
     }
 }

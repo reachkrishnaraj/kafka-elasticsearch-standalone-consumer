@@ -29,7 +29,29 @@
 
 * This way, there is a clear way of subscribing and processing messages from multiple partitions across multiple topics using this Stand alone Consumer.
 
-# How to use ?
+# How to use ? 
+
+### Method 1: running as a standard Jar 
+
+**1. Download the code into a `$CONSUMER_HOME` dir.
+
+**2. Update (or create your own copy of) the `$CONSUMER_HOME`/src/main/resources/kafkaESConsumerLocal.properties file - update all relevant properties as explained in the comments
+
+**3. update `$CONSUMER_HOME`/src/main/resources/logback.xml - specify directory you want to store logs in:
+	<property name="LOG_DIR" value="/tmp"/>
+
+**4. build/create the app jar:
+		cd $CONSUMER_HOME
+     	mvn clean package
+	The kafka-es-consumer-0.2.jar will be created in the $CONSUMER_HOME/bin
+
+**5. run the app [use JDK1.8] :  
+		cd $CONSUMER_HOME/bin
+		java -jar kafka-es-consumer-0.2.jar kafkaESConsumerLocal.properties
+
+ 
+
+### Method 2: running via JSVC as a Daemon
 
 **1. Download the code. Let's say, `$CONSUMER_HOME` contains the code.**
 

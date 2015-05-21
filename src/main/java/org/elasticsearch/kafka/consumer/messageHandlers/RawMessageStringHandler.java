@@ -6,13 +6,13 @@ import java.util.Iterator;
 import kafka.message.Message;
 import kafka.message.MessageAndOffset;
 
-import org.apache.log4j.Logger;
-import org.elasticsearch.kafka.consumer.ConsumerLogger;
 import org.elasticsearch.kafka.consumer.MessageHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RawMessageStringHandler extends MessageHandler {
 
-	Logger logger = ConsumerLogger.getLogger(this.getClass());
+	private static final Logger logger = LoggerFactory.getLogger(RawMessageStringHandler.class);
 
 	public RawMessageStringHandler(){
 		super();
@@ -40,8 +40,8 @@ public class RawMessageStringHandler extends MessageHandler {
 				// of one message fails, or if you just want to log this message into failedEvents.log
 				// for later re-processing
 				// for now - just log and continue
-				logger.error("ERROR transforming message at offset=" +  messageAndOffset.offset() + 
-						" - skipping it: " + bytesMessage, e);
+				logger.error("ERROR transforming message at offset={} - skipping it: {}", 
+						messageAndOffset.offset(), new String(bytesMessage), e);
 				continue;
 			}
 			this.getBuildReqBuilder().add(
@@ -51,9 +51,9 @@ public class RawMessageStringHandler extends MessageHandler {
 			);
 			numProcessedMessages++;
 		}
-		logger.info("Total # of messages in this batch: " + numMessagesInBatch + 
-				"; # of successfully transformed and added to Index messages: " + numProcessedMessages + 
-				"; offsetOfNextBatch=" + offsetOfNextBatch);
+		logger.info("Total # of messages in this batch: {};" + 
+			"# of successfully transformed and added to Index messages: {}; offsetOfNextBatch: {}", 
+			numMessagesInBatch, numProcessedMessages, offsetOfNextBatch);
 		return offsetOfNextBatch;
 	}
 	

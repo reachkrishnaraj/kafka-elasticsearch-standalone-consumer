@@ -4,9 +4,12 @@ import java.io.InputStream;
 import java.util.Properties;
 
 import org.elasticsearch.common.unit.TimeValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ConsumerConfig {
 
+	private static final Logger logger = LoggerFactory.getLogger(ConsumerConfig.class);
 	Properties prop = new Properties();
 	InputStream input = null;
 	// Logger object cannot be initialized since the logProperty file for the
@@ -41,13 +44,11 @@ public class ConsumerConfig {
 	public final String statsdPrefix;
 	public final String statsdHost;
 	public final int statsdPort;
-	// Preferred Size of message to be fetched from Kafka in 1 Fetch call to
-	// kafka
+	// Preferred Size of message to be fetched from Kafka in 1 Fetch call to kafka
 	public final int bulkSize;
 	// Timeout when fetching message from Kafka
 	public final TimeValue bulkTimeout;
-	// Preferred Message Encoding to process the message before posting it to
-	// ElasticSearch
+	// Preferred Message Encoding to process the message before posting it to ElasticSearch
 	public final String messageEncoding;
 	// TBD
 	public final boolean isGuranteedEsPostMode;
@@ -59,11 +60,9 @@ public class ConsumerConfig {
 	public final String esHost;
 	// Port number of ElasticSearch
 	public final int esPort;
-	// IndexName in ElasticSearch to which the processed Message has to be
-	// posted
+	// IndexName in ElasticSearch to which the processed Message has to be posted
 	public final String esIndex;
-	// IndexType in ElasticSearch to which the processed Message has to be
-	// posted
+	// IndexType in ElasticSearch to which the processed Message has to be posted
 	public final String esIndexType;
 	// Percentage of message failure tolerance
 	public final int esMsgFailureTolerancePercent;
@@ -89,19 +88,19 @@ public class ConsumerConfig {
 
 	public ConsumerConfig(String configFile) throws Exception {
 		try {
-			System.out.println("configFile : " + configFile);
+			logger.info("configFile : " + configFile);
 			input = this.getClass().getClassLoader()
 					.getResourceAsStream(configFile);
 		} catch (Exception e) {
 			// logger.fatal("Error reading/loading ConfigFile. Throwing the error. Error Message::"
 			// + e.getMessage());
-			System.out.println("Error reading/loading configFile: " + e.getMessage());
+			logger.error("Error reading/loading configFile: " + e.getMessage(), e);
 			e.printStackTrace();
 			throw e;
 		}
 
 		if (input == null) {
-			System.out.println("Error loading config file - inputStream is null, exiting");
+			logger.info("Error loading config file - inputStream is null, exiting");
 			throw new Exception("Error loading config file - inputStream is null");
 		}
 
@@ -148,7 +147,7 @@ public class ConsumerConfig {
 				"consumerSleepTime", "25"));
 
 		input.close();
-		System.out.println("Config reading complete !");
+		logger.info("Config reading complete !");
 	}
 
 }

@@ -4,19 +4,19 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
 
-import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.elasticsearch.kafka.consumer.ConsumerLogger;
 import org.elasticsearch.kafka.consumer.mappers.AccessLogMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AccessLogMessageHandler extends RawMessageStringHandler {
 	
+	private static final Logger logger = LoggerFactory.getLogger(AccessLogMessageHandler.class);
 	private final String actualDateFormat = "dd/MMM/yyyy:hh:mm:ss";
 	private final String expectedDateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 	private final String actualTimeZone = "Europe/London";
 	private final String expectedTimeZone = "Europe/London";
-	Logger logger = ConsumerLogger.getLogger(this.getClass());
 	
 	private ObjectMapper mapper = new ObjectMapper();
 	private AccessLogMapper accessLogMsgObj = new AccessLogMapper();
@@ -30,7 +30,7 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 	
 	public AccessLogMessageHandler(){
 		super();
-		logger.info("Initialied org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler");		
+		logger.info("Initialized org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler");		
 	}
 	
 	@Override

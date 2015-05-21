@@ -128,6 +128,17 @@
 			<artifactId>commons-daemon</artifactId>
 			<version>1.0.15</version>
 		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.1.3</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-core</artifactId>
+			<version>1.1.3</version>
+		</dependency>
+		
 	</dependencies>
 	<build>
 		<directory>bin</directory>
@@ -140,7 +151,7 @@
 			<archive>
 			  <manifest>
 				<addClasspath>true</addClasspath>
-				<mainClass>org.elasticsearch.kafka.consumer.daemon.KafkaConsumerDaemon</mainClass>
+				<mainClass>org.elasticsearch.kafka.consumer.daemon.KafkaConsumerMain</mainClass>
 				<classpathPrefix>dep-jars/</classpathPrefix>
 			  </manifest>
 			</archive>
@@ -149,7 +160,7 @@
             <plugin>
 		<groupId>org.apache.maven.plugins</groupId>
 		<artifactId>maven-dependency-plugin</artifactId>
-		<version>2.5.1</version>
+		<version>2.8</version>
 		<executions>
 		  <execution>
 			<id>copy-dependencies</id>
@@ -169,8 +180,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
-					<source>1.7</source>
-					<target>1.7</target>
+					<source>1.8</source>
+					<target>1.8</target>
 				</configuration>
 			</plugin>
 			<!-- <plugin>
