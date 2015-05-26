@@ -5,6 +5,8 @@ import java.util.Date;
 import java.util.TimeZone;
 
 import org.codehaus.jackson.map.ObjectMapper;
+import org.elasticsearch.client.transport.TransportClient;
+import org.elasticsearch.kafka.consumer.ConsumerConfig;
 import org.elasticsearch.kafka.consumer.mappers.AccessLogMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,8 +30,8 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 	private Date date = null;
 	private String[] serverAndInstance = null;
 	
-	public AccessLogMessageHandler(){
-		super();
+	public AccessLogMessageHandler(TransportClient client,ConsumerConfig config){
+		super(client, config);
 		logger.info("Initialized org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler");		
 	}
 	

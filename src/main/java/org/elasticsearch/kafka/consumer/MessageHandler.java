@@ -20,23 +20,19 @@ public abstract class MessageHandler {
 	private ConsumerConfig config;
 	private BulkRequestBuilder bulkReqBuilder;
 		
-	public MessageHandler(){
+	public MessageHandler(Client client,ConsumerConfig config){
+		this.esClient = client;
+		this.config = config;
+		this.bulkReqBuilder = null;
+		logger.info("Created Message Handler");
 	}
 	
 	public Client getEsClient() {
 		return esClient;
 	}
 
-	public void setEsClient(Client esClient) {
-		this.esClient = esClient;
-	}
-
 	public ConsumerConfig getConfig() {
 		return config;
-	}
-
-	public void setConfig(ConsumerConfig config) {
-		this.config = config;
 	}
 
 	public BulkRequestBuilder getBuildReqBuilder() {
@@ -46,14 +42,7 @@ public abstract class MessageHandler {
 	public void setBuildReqBuilder(BulkRequestBuilder bulkReqBuilder) {
 		this.bulkReqBuilder = bulkReqBuilder;
 	}
-	
-	public void initMessageHandler(Client client,ConsumerConfig config){
-		this.esClient = client;
-		this.config = config;
-		this.bulkReqBuilder = null;
-		logger.info("Initialized Message Handler");
-	}
-	
+		
 	public boolean postToElasticSearch() throws Exception {
 		BulkResponse bulkResponse = null;
 		BulkItemResponse bulkItemResp = null;

@@ -6,6 +6,10 @@ import java.util.Iterator;
 import kafka.message.Message;
 import kafka.message.MessageAndOffset;
 
+import org.elasticsearch.client.transport.TransportClient;
+import org.elasticsearch.kafka.consumer.BasicIndexHandler;
+import org.elasticsearch.kafka.consumer.ConsumerConfig;
+import org.elasticsearch.kafka.consumer.IndexHandler;
 import org.elasticsearch.kafka.consumer.MessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,9 +17,13 @@ import org.slf4j.LoggerFactory;
 public class RawMessageStringHandler extends MessageHandler {
 
 	private static final Logger logger = LoggerFactory.getLogger(RawMessageStringHandler.class);
+	private IndexHandler indexHandler;
 
-	public RawMessageStringHandler(){
-		super();
+	public RawMessageStringHandler(TransportClient client,ConsumerConfig config){
+		super(client, config);
+		// for this message handler class - we can use the BasicIndexHandler since
+		// there is not custom logic for index name lookup
+		indexHandler = new BasicIndexHandler(this.getConfig());
 		logger.info("Initialized RawMessageStringHandler");
 	}
 	
@@ -46,7 +54,7 @@ public class RawMessageStringHandler extends MessageHandler {
 			}
 			this.getBuildReqBuilder().add(
 				this.getEsClient().prepareIndex(
-					this.getConfig().esIndex, this.getConfig().esIndexType)
+					indexHandler.getIndexName(null), indexHandler.getIndexType(null))
 					.setSource(transformedMessage)
 			);
 			numProcessedMessages++;

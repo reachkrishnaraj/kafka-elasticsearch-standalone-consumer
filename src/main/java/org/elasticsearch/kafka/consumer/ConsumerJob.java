@@ -42,7 +42,7 @@ public class ConsumerJob {
 				.split(",");
 		logger.info("ElasticSearch HostPortList is: {} ", consumerConfig.esHostPortList);
 		logger.info("Initializing ElasticSearch ...");
-		logger.info("esClusterName={}" + consumerConfig.esClusterName);
+		logger.info("esClusterName={}", consumerConfig.esClusterName);
 
 		// TODO add validation of host:port syntax - to avoid Runtime exceptions
 		try {
@@ -188,9 +188,10 @@ public class ConsumerJob {
 	private void createMessageHandler() throws Exception {
 		try {
 			logger.info("MessageHandler Class given in config is {}", consumerConfig.messageHandlerClass);
-			msgHandler = (MessageHandler) Class.forName(
-					consumerConfig.messageHandlerClass).newInstance();
-			msgHandler.initMessageHandler(esClient, consumerConfig);
+			msgHandler = (MessageHandler) Class
+					.forName(consumerConfig.messageHandlerClass)
+					.getConstructor(TransportClient.class, ConsumerConfig.class)
+					.newInstance(esClient, consumerConfig);
 			logger.debug("Created and initialized MessageHandler: {}", consumerConfig.messageHandlerClass);
 		} catch (Exception e) {
 			e.printStackTrace();
