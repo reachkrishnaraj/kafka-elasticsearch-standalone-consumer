@@ -1,5 +1,6 @@
 package org.elasticsearch.kafka.consumer.messageHandlers;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
@@ -7,7 +8,6 @@ import kafka.message.Message;
 import kafka.message.MessageAndOffset;
 
 import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.kafka.consumer.BasicIndexHandler;
 import org.elasticsearch.kafka.consumer.ConsumerConfig;
 import org.elasticsearch.kafka.consumer.IndexHandler;
 import org.elasticsearch.kafka.consumer.MessageHandler;
@@ -19,11 +19,23 @@ public class RawMessageStringHandler extends MessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(RawMessageStringHandler.class);
 	private IndexHandler indexHandler;
 
-	public RawMessageStringHandler(TransportClient client,ConsumerConfig config){
+	public RawMessageStringHandler(TransportClient client,ConsumerConfig config) throws Exception{
 		super(client, config);
 		// for this message handler class - we can use the BasicIndexHandler since
 		// there is not custom logic for index name lookup
-		indexHandler = new BasicIndexHandler(this.getConfig());
+		try {
+			indexHandler = (IndexHandler) Class
+					.forName(config.indexHandlerClass)
+					.getConstructor(ConsumerConfig.class)
+					.newInstance(config);
+			logger.info("Created IndexHandler: ", config.indexHandlerClass);
+		} catch (InstantiationException | IllegalAccessException
+				| IllegalArgumentException | InvocationTargetException
+				| NoSuchMethodException | SecurityException
+				| ClassNotFoundException e) {
+			logger.error("Exception creating IndexHandler: " + e.getMessage(), e);
+			throw e;
+		}
 		logger.info("Initialized RawMessageStringHandler");
 	}
 	
@@ -59,7 +71,7 @@ public class RawMessageStringHandler extends MessageHandler {
 			);
 			numProcessedMessages++;
 		}
-		logger.info("Total # of messages in this batch: {};" + 
+		logger.info("Total # of messages in this batch: {}; " + 
 			"# of successfully transformed and added to Index messages: {}; offsetOfNextBatch: {}", 
 			numMessagesInBatch, numProcessedMessages, offsetOfNextBatch);
 		return offsetOfNextBatch;

@@ -1,6 +1,6 @@
 package org.elasticsearch.kafka.consumer;
 
-import java.util.Properties;
+import java.util.HashMap;
 
 /**
  * Basic Index handler that returns ElasticSearch index name defined 
@@ -27,12 +27,12 @@ public class BasicIndexHandler implements IndexHandler {
 	}
 
 	@Override
-	public String getIndexName(Properties indexLookupProperties) {
+	public String getIndexName(HashMap<String, Object> indexLookupProperties) {
 		return indexName;
 	}
 
 	@Override
-	public String getIndexType(Properties indexLookupProperties) {
+	public String getIndexType(HashMap<String, Object> indexLookupProperties) {
 		return indexType;
 	}
 

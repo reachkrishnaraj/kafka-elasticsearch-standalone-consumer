@@ -30,7 +30,7 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 	private Date date = null;
 	private String[] serverAndInstance = null;
 	
-	public AccessLogMessageHandler(TransportClient client,ConsumerConfig config){
+	public AccessLogMessageHandler(TransportClient client,ConsumerConfig config) throws Exception{
 		super(client, config);
 		logger.info("Initialized org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler");		
 	}

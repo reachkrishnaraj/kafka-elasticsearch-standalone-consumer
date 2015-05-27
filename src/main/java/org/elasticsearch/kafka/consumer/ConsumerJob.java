@@ -51,7 +51,7 @@ public class ConsumerJob {
 					.build();
 			esClient = new TransportClient(settings);
 			for (String eachHostPort : esHostPortList) {
-				logger.info("ading [{}] to TransportClient ... ", eachHostPort);
+				logger.info("adding [{}] to TransportClient ... ", eachHostPort);
 				esClient.addTransportAddress(
 					new InetSocketTransportAddress(
 						eachHostPort.split(":")[0].trim(), 
@@ -194,15 +194,13 @@ public class ConsumerJob {
 					.newInstance(esClient, consumerConfig);
 			logger.debug("Created and initialized MessageHandler: {}", consumerConfig.messageHandlerClass);
 		} catch (Exception e) {
-			e.printStackTrace();
+			logger.error("Exception creating MessageHandler class: " + e.getMessage(), e);
 			throw e;
-
 		}
 	}
 
 	public void doRun() throws Exception {
 		long jobStartTime = System.currentTimeMillis();
-		boolean esPostResult = false;
 		this.checkKafkaOffsets();
 		if (!isStartingFirstTime) {
 			// do not read offset from Kafka after each run - we just stored it there
@@ -279,7 +277,7 @@ public class ConsumerJob {
 		}
 		try {
 			logger.info("posting the messages to ElasticSearch ...");
-			esPostResult = msgHandler.postToElasticSearch();
+			msgHandler.postToElasticSearch();
 		} catch (ElasticsearchException e) {
 			logger.error("Error posting messages to ElasticSearch, re-initializing: ", e);
 			this.reInitElasticSearch();
@@ -290,7 +288,7 @@ public class ConsumerJob {
 		long timeAftEsPost = System.currentTimeMillis();
 		logger.debug("Approx time to post of ElasticSearch: {} ms",
 				(timeAftEsPost - timeAtPrepareES));
-		logger.info("Commiting offset #{} " + nextOffsetToProcess);
+		logger.info("Commiting offset: {} ", nextOffsetToProcess);
 		// TODO optimize getting of the fetchResponse.errorCode - in some cases there is no error, 
 		// so no need to call the API every time
 		try {

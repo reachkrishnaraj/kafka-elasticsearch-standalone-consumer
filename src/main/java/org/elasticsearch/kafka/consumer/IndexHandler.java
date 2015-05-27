@@ -1,6 +1,6 @@
 package org.elasticsearch.kafka.consumer;
 
-import java.util.Properties;
+import java.util.HashMap;
 
 /**
  * Basic interface for ElasticSearch Index name lookup 
@@ -19,7 +19,7 @@ public interface IndexHandler {
 	// default index type, if not specified/calculated otherwise
 	public static final String DEFAULT_INDEX_TYPE = "test_index_type";
 
-	public String getIndexName (Properties indexLookupProperties);
-	public String getIndexType (Properties indexLookupProperties);
+	public String getIndexName (HashMap<String, Object> indexLookupProperties);
+	public String getIndexType (HashMap<String, Object> indexLookupProperties);
 
 }

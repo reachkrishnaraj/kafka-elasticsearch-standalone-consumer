@@ -21,8 +21,10 @@ public class ConsumerConfig {
 
 	// Kafka ZooKeeper's IP Address/HostName without port
 	public final String zookeeper;
-	// Full class path and name for the concrete message handler class factory
+	// Full class path and name for the concrete message handler class 
 	public final String messageHandlerClass;
+	// Full class name of a custom IndexHandler implementation class
+	public final String indexHandlerClass;
 	// Kafka Broker's IP Address/HostName
 	public final String brokerHost;
 	// Kafka's Broker List for producer
@@ -107,9 +109,10 @@ public class ConsumerConfig {
 		// load the properties file
 		prop.load(input);
 		zookeeper = (String) prop.getProperty("zookeeper", "localhost");
-		messageHandlerClass = prop
-				.getProperty("messageHandlerClass",
+		messageHandlerClass = prop.getProperty("messageHandlerClass",
 						"org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler");
+		indexHandlerClass = prop.getProperty("indexHandlerClass",
+						"org.elasticsearch.kafka.consumer.BasicIndexHandler");
 		brokerHost = prop.getProperty("brokerHost", "localhost");
 		brokerPort = Integer.parseInt(prop.getProperty("brokerPort", "9092"));
 		brokerListForProducer = prop.getProperty("brokerListForProducer",
