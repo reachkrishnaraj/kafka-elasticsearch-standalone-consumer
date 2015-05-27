@@ -1,28 +1,24 @@
 package org.elasticsearch.kafka.consumer.messageHandlers;
 
-import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.TimeZone;
 
-import kafka.message.Message;
-
-import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.elasticsearch.kafka.consumer.ConsumerLogger;
-import org.elasticsearch.kafka.consumer.helpers.ExceptionHelper;
+import org.elasticsearch.client.transport.TransportClient;
+import org.elasticsearch.kafka.consumer.ConsumerConfig;
 import org.elasticsearch.kafka.consumer.mappers.AccessLogMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AccessLogMessageHandler extends RawMessageStringHandler {
 	
+	private static final Logger logger = LoggerFactory.getLogger(AccessLogMessageHandler.class);
 	private final String actualDateFormat = "dd/MMM/yyyy:hh:mm:ss";
 	private final String expectedDateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
 	private final String actualTimeZone = "Europe/London";
 	private final String expectedTimeZone = "Europe/London";
-	Logger logger = ConsumerLogger.getLogger(this.getClass());
 	
 	private ObjectMapper mapper = new ObjectMapper();
 	private AccessLogMapper accessLogMsgObj = new AccessLogMapper();
@@ -34,82 +30,31 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 	private Date date = null;
 	private String[] serverAndInstance = null;
 	
-	public AccessLogMessageHandler(){
-		super();
-		logger.info("Initialied org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler");		
+	public AccessLogMessageHandler(TransportClient client,ConsumerConfig config) throws Exception{
+		super(client, config);
+		logger.info("Initialized org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler");		
 	}
 	
 	@Override
-	public void transformMessage() throws Exception {
-		logger.info("*** Starting to transform messages ***");
-		logger.info("# of message available for this round is:" + this.getOffsetMsgMap().size());
-		
-		String transformedMsg;
-		Long offsetKey;
-		ByteBuffer payload;
-		byte[] bytes;
-		Map.Entry<Long,Message> keyValuePair;
-		
-		this.getOffsetFailedMsgMap().clear();
-		this.getEsPostObject().clear();
-		
-		Iterator<Map.Entry<Long,Message>> offsetMsgMapItr = this.getOffsetMsgMap().entrySet().iterator();
-		while (offsetMsgMapItr.hasNext()) {
-			transformedMsg = "";
-			keyValuePair = (Map.Entry<Long,Message>)offsetMsgMapItr.next();
-			payload = keyValuePair.getValue().payload();
-			bytes = new byte[payload.limit()];
-			payload.get(bytes);
-			offsetKey = keyValuePair.getKey();
-			offsetMsgMapItr.remove();
-			try{
-            	//logger.info("above to convert the message to JSON");
-            	transformedMsg = convertToJson(new String(bytes, "UTF-8"), offsetKey);
-            	logger.debug(transformedMsg);
-            }
-			catch(Exception e){
-				this.getOffsetFailedMsgMap().put(offsetKey, new String(bytes, "UTF-8"));
-            	logger.error("Failed to transform message @ offset::" + offsetKey + "and failed message is::"+ new String(bytes, "UTF-8"));
-            	logger.error("Error is::" + ExceptionHelper.getStrackTraceAsString(e));
-            }
-			
-			if(transformedMsg != null && !transformedMsg.isEmpty()){
-				this.getEsPostObject().add(transformedMsg);
-			}
-			keyValuePair = null;
-		}
-		this.sizeOfOffsetMsgMap = this.getOffsetFailedMsgMap().size();
-		logger.info("**** Completed transforming all ATG10 access log messages ****");	
-
-		//Above code will remove the message from the LinkedHashMap and hence good for memory. Need to remove the below block of code.	
-	
-		transformedMsg = null;
-		offsetKey = null;
-		payload = null;
-		bytes = null;
-		keyValuePair = null;
+	public byte[] transformMessage( byte[] inputMessage, Long offset) throws Exception {
+		String outputMessageStr = this.convertToJson(new String(inputMessage, "UTF-8"), offset);
+		return outputMessageStr.getBytes(); 		
 	}
 
-	
-	public String convertToJson(String rawMsg, Long offset) throws Exception{
-				
-		this.splittedMsg =  rawMsg.split("\\|");
-		
+	public String convertToJson(String rawMsg, Long offset) throws Exception{				
+		this.splittedMsg =  rawMsg.split("\\|");		
 		for(int i=0; i < this.splittedMsg.length; i++){
 			 this.splittedMsg[i] = this.splittedMsg[i].trim();
-		}
-	
+		}	
 		this.accessLogMsgObj = new AccessLogMapper();
 		accessLogMsgObj.setRawMessage(rawMsg);
 		accessLogMsgObj.getKafkaMetaData().setOffset(offset);
 		accessLogMsgObj.getKafkaMetaData().setTopic(this.getConfig().topic);
 		accessLogMsgObj.getKafkaMetaData().setConsumerGroupName(this.getConfig().consumerGroupName);
-		accessLogMsgObj.getKafkaMetaData().setPartition(this.getConfig().partition);
-		
+		accessLogMsgObj.getKafkaMetaData().setPartition(this.getConfig().partition);		
 		accessLogMsgObj.setIp(splittedMsg[0].trim());
 		accessLogMsgObj.setProtocol(splittedMsg[1].trim());
-		
-		
+				
 		if(splittedMsg[5].toUpperCase().contains("GET")){
 			accessLogMsgObj.setIp(splittedMsg[3].trim());
 			accessLogMsgObj.setProtocol(splittedMsg[4].trim());
@@ -134,15 +79,12 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 			this.actualFormat.setTimeZone(TimeZone.getTimeZone(actualTimeZone));
 			
 			this.expectedFormat = new SimpleDateFormat(expectedDateFormat);
-			this.expectedFormat.setTimeZone(TimeZone.getTimeZone(expectedTimeZone));
-			
+			this.expectedFormat.setTimeZone(TimeZone.getTimeZone(expectedTimeZone));			
 			this.dateString = splittedMsg[0].split(" " );
-			
 			this.date = actualFormat.parse(dateString[0].trim().replaceAll("\\[", "").trim());
 			accessLogMsgObj.setTimeStamp(expectedFormat.format(date));
 		}
-		
-		
+				
 		if(splittedMsg[5].toUpperCase().contains("POST")){
 			accessLogMsgObj.setIp(splittedMsg[3].trim());
 			accessLogMsgObj.setProtocol(splittedMsg[4].trim());
@@ -171,8 +113,7 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 			expectedFormat = new SimpleDateFormat(expectedDateFormat);
 			expectedFormat.setTimeZone(TimeZone.getTimeZone(expectedTimeZone));
 			
-			this.dateString = splittedMsg[0].split(" " );
-			
+			this.dateString = splittedMsg[0].split(" " );			
 			this.date = actualFormat.parse(dateString[0].trim().replaceAll("\\[", "").trim());
 			accessLogMsgObj.setTimeStamp(expectedFormat.format(date));		
 		}
@@ -185,10 +126,7 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 		this.date = null;
 		this.serverAndInstance = null;
 		
-	return mapper.writeValueAsString(accessLogMsgObj);		
-	
+		return mapper.writeValueAsString(accessLogMsgObj);			
 	}
-
-	
 	
 }
