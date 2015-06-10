@@ -17,7 +17,7 @@
 		</license>
 	</licenses>
 	<properties>
-		<elasticsearch.version>1.0.0</elasticsearch.version>
+		<elasticsearch.version>1.5.1</elasticsearch.version>
 	</properties>
 	<pluginRepositories>
         <pluginRepository>

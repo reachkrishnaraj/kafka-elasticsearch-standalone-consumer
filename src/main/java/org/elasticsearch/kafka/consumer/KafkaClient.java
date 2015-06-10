@@ -33,65 +33,45 @@ public class KafkaClient {
 
 	
 	private static final Logger logger = LoggerFactory.getLogger(KafkaClient.class);
-	// TODO externalize this property
-	private final int FIND_KAFKA_LEADER_TIMEOUT = 10000;
-	CuratorFramework curator;
-	SimpleConsumer simpleConsumer;
-	String zooKeeper;
-	String incomingBrokerHost;
-	int inComingBrokerPort;
-	String inComingbrokerURL;
-	String kafkaGroupId;
+	private CuratorFramework curator;
+	private SimpleConsumer simpleConsumer;
+	String kafkaClientId;
 	String topic;
 	int partition;
-	List<String> m_replicaBrokers;
-	String leadBrokerHost;
-	int leadBrokerPort;
-	String leadBrokerURL;
-	ConsumerConfig consumerConfig;
+	private String leaderBrokerHost;
+	private int leaderBrokerPort;
+	private String leaderBrokerURL;
+	private final ConsumerConfig consumerConfig;
+	private String[] kafkaBrokersArray;
 
 	
-	public KafkaClient(ConsumerConfig a_config, String a_zooKeeper, String a_brokerHost, 
-			int a_port, int a_partition, String a_kafkaGroupId, String a_topic) throws Exception {
+	public KafkaClient(final ConsumerConfig config, String kafkaGroupId) throws Exception {
 		logger.info("Instantiating KafkaClient");
-		this.consumerConfig = a_config;
+		this.consumerConfig = config;
 		
-		this.zooKeeper = a_zooKeeper;
-		this.topic = a_topic;
-		this.incomingBrokerHost = a_brokerHost;
-		this.inComingBrokerPort = a_port;
-		this.inComingbrokerURL = this.incomingBrokerHost + ":" + this.inComingBrokerPort;
-		this.kafkaGroupId = a_kafkaGroupId;
-		this.partition = a_partition;
+		this.topic = config.topic;
+		this.kafkaClientId = kafkaGroupId;
+		this.partition = config.partition;
+		kafkaBrokersArray = config.kafkaBrokersList.trim().split(",");
 		logger.info("### KafkaClient Config: ###");
-		logger.info("zooKeeper: {}", this.zooKeeper);
-		logger.info("topic: {}", this.topic);
-		logger.info("incomingBrokerHost: {}", this.incomingBrokerHost);
-		logger.info("inComingBrokerPort: {}", this.inComingBrokerPort);
-		logger.info("inComingbrokerURL: {}", this.inComingbrokerURL);
-		logger.info("kafkaGroupId: {}", this.kafkaGroupId);
-		logger.info("partition: {}", this.partition);
-		m_replicaBrokers = new ArrayList<String>();
-		logger.info("Starting to connect to Zookeeper");
-		connectToZooKeeper(this.zooKeeper);
-		logger.info("Starting to find the Kafka Lead Broker");
+		logger.info("kafkaZookeeperList: {}", config.kafkaZookeeperList);
+		logger.info("kafkaBrokersList: {}", config.kafkaBrokersList);
+		logger.info("kafkaGroupId: {}", kafkaGroupId);
+		logger.info("topic: {}", topic);
+		logger.info("partition: {}", partition);
+		connectToZooKeeper();
 		findLeader();
-		logger.info("Starting to initiate Kafka Consumer");
 		initConsumer();
 		
 	}
-	
+			
 	void connectToZooKeeper() throws Exception {
-		connectToZooKeeper(this.zooKeeper);
-	}
-	
-	
-	void connectToZooKeeper(String zooKeeper) throws Exception {
 		try {
-			curator = CuratorFrameworkFactory.newClient(zooKeeper, 1000, 15000,
-					new RetryNTimes(5, 2000));
+			curator = CuratorFrameworkFactory.newClient(consumerConfig.kafkaZookeeperList, 
+					consumerConfig.zkSessionTimeoutMs, consumerConfig.zkConnectionTimeoutMs,
+					new RetryNTimes(consumerConfig.zkCuratorRetryTimes, consumerConfig.zkCuratorRetryDelayMs));
 			curator.start();
-			logger.info("Connection to Kafka Zookeeper successfull");
+			logger.info("Connected to Kafka Zookeeper successfully");
 		} catch (Exception e) {
 			logger.error("Failed to connect to Zookeer: " + e.getMessage());	
 			throw e;
@@ -100,8 +80,12 @@ public class KafkaClient {
 
 	public void initConsumer() throws Exception{
 		try{
-			this.simpleConsumer = new SimpleConsumer(leadBrokerHost, leadBrokerPort, 10000, 1024 * 1024 * 10, kafkaGroupId);
-			logger.info("Succesfully initialized Kafka Consumer");
+			this.simpleConsumer = new SimpleConsumer(
+					leaderBrokerHost, leaderBrokerPort, 
+					consumerConfig.kafkaSimpleConsumerSocketTimeoutMs, 
+					consumerConfig.kafkaSimpleConsumerBufferSizeBytes, 
+					kafkaClientId);
+			logger.info("Initialized Kafka Consumer successfully");
 		}
 		catch(Exception e){
 			logger.error("Failed to initialize Kafka Consumer: " + e.getMessage());
@@ -115,13 +99,13 @@ public class KafkaClient {
 		short versionID = 0;
 		int correlationId = 0;
 		try{
-			TopicAndPartition tp = new TopicAndPartition(this.topic, this.partition);
+			TopicAndPartition tp = new TopicAndPartition(topic, partition);
 			OffsetAndMetadata offsetMetaAndErr = new OffsetAndMetadata(
 					offset, OffsetAndMetadata.NoMetadata(), errorCode);
 			Map<TopicAndPartition, OffsetAndMetadata> mapForCommitOffset = new HashMap<>();
 			mapForCommitOffset.put(tp, offsetMetaAndErr);
 			kafka.javaapi.OffsetCommitRequest offsetCommitReq = new kafka.javaapi.OffsetCommitRequest(
-					kafkaGroupId, mapForCommitOffset, correlationId, kafkaGroupId, versionID);
+					kafkaClientId, mapForCommitOffset, correlationId, kafkaClientId, versionID);
 			OffsetCommitResponse offsetCommitResp = this.simpleConsumer.commitOffsets(offsetCommitReq);
 			logger.debug("Completed OffsetSet commit. OffsetCommitResponse ErrorCode = {} ", offsetCommitResp.errors().get(tp)+ " Returning to the caller.");
 			return (Short) offsetCommitResp.errors().get(tp);
@@ -133,12 +117,29 @@ public class KafkaClient {
 	}
 		
 	private PartitionMetadata findLeader() throws Exception {
-		logger.info("Starting to find the leader broker for Kafka");
-		PartitionMetadata returnMetaData = null;
+		logger.info("Looking for Kafka leader broker ...");
+		PartitionMetadata currentPartitionMetaData = null;
 		SimpleConsumer leadFindConsumer = null;
+		// take the first kafka broker from the list - it should provide all required META info anyway
+		// TODO: harden this by looping over all specified brokers if some of them fail
+		String firstBrokerStr = kafkaBrokersArray[0];
+		String[] brokerStrTokens = firstBrokerStr.split(":");
+		if (brokerStrTokens.length < 2) {
+			logger.error(
+				"Failed to find Kafka leader broker - wrong config, not enough tokens: firstBrokerStr={}", 
+				firstBrokerStr);
+			throw new Exception("Failed to find Kafka leader broker - wrong config, not enough tokens: firstBrokerStr=" + 
+				firstBrokerStr);
+		}
+		String kafkaBrokerHost = brokerStrTokens[0];
+		String kafkaBrokerPortStr = brokerStrTokens[1];
 		try {
-			leadFindConsumer = new SimpleConsumer(incomingBrokerHost, inComingBrokerPort, FIND_KAFKA_LEADER_TIMEOUT,
-					consumerConfig.bulkSize, "leaderLookup");
+			int kafkaBrokerPort = Integer.parseInt(kafkaBrokerPortStr);
+			leadFindConsumer = new SimpleConsumer(
+					kafkaBrokerHost, kafkaBrokerPort, 
+					consumerConfig.kafkaSimpleConsumerSocketTimeoutMs, 
+					consumerConfig.kafkaSimpleConsumerBufferSizeBytes, 
+					"leaderLookup");
 			List<String> topics = new ArrayList<String>();
 			topics.add(this.topic);
 			TopicMetadataRequest req = new TopicMetadataRequest(topics);
@@ -149,38 +150,49 @@ public class KafkaClient {
 				for (PartitionMetadata part : item.partitionsMetadata()) {
 					if (part.partitionId() == this.partition) {
 						//System.out.println("ITS TRUE");
-						returnMetaData = part;
+						currentPartitionMetaData = part;
 					break;
 					}
 				}
 			}
 		} catch (Exception e) {
-			logger.error("Error communicating with Broker [{}] to find Leader for topic=[{}], partition=[{}" + partition
-					+ "] Error: " + e.getMessage(), incomingBrokerHost,topic, partition, e.getMessage());
+			logger.error("Failed to find leader for Kafka Broker=[{}], topic=[{}], partition=[{}]; Error: {}" + 
+					kafkaBrokerHost, topic, partition, e.getMessage());
 			throw e;
 		} finally {
-			if (leadFindConsumer != null)
+			if (leadFindConsumer != null){
 				leadFindConsumer.close();
-			logger.info("closed the connection");
+				logger.debug("closed the leadFindConsumer connection");
+			}
+		}
+		if (currentPartitionMetaData == null) {
+			logger.error("Failed to find leader for Kafka Broker=[{}], topic=[{}], partition=[{}]: PartitionMetadata is null" + 
+					kafkaBrokerHost, topic, partition);
+			throw new Exception("Failed to find leader for Kafka Broker [" +
+					kafkaBrokerHost + "], topic=[" + topic + "], partition=[" + partition + 
+					"]: currentPartitionMetadata is null");
 			
 		}
+
+		/*
+		List<String> m_replicaBrokers = new ArrayList<>();
 		if (returnMetaData != null) {
-			m_replicaBrokers.clear();
 			for (kafka.cluster.Broker replica : returnMetaData.replicas()) {
 				m_replicaBrokers.add(replica.host());
 			}
 		}
+		/*  */
 		
-		this.leadBrokerHost = returnMetaData.leader().host();
-		this.leadBrokerPort = returnMetaData.leader().port();
-		this.leadBrokerURL = this.leadBrokerHost + ":" + this.leadBrokerPort;
-		logger.info("Computed leadBrokerURL: {} , returning ", this.leadBrokerURL);
-		return returnMetaData;
+		leaderBrokerHost = currentPartitionMetaData.leader().host();
+		leaderBrokerPort = currentPartitionMetaData.leader().port();
+		leaderBrokerURL = leaderBrokerHost + ":" + leaderBrokerPort;
+		logger.info("Found leader: leaderBrokerURL={}", leaderBrokerURL);
+		return currentPartitionMetaData;
 	}
 
 	
 	public PartitionMetadata findNewLeader() throws Exception {
-		logger.info("Starting to findNewLeader for kafka ...");
+		logger.info("Starting the findNewLeader() ...");
 		for (int i = 0; i < 3; i++) {
 			logger.info("Attempt #{}", i);
 			boolean goToSleep = false;
@@ -191,16 +203,16 @@ public class KafkaClient {
             } else if (metadata.leader() == null) {
             	logger.info("MetaData leader is Empty, going to sleep");
             	goToSleep = true;
-            } else if (this.leadBrokerHost.equalsIgnoreCase(metadata.leader().host()) && i <= 1) {
+            } else if (leaderBrokerHost.equalsIgnoreCase(metadata.leader().host()) && i <= 1) {
                 // first time through if the leader hasn't changed give ZooKeeper a second to recover
                 // second time, assume the broker did recover before failover, or it was a non-Broker issue
                 //
                 goToSleep = true;
             } else {
-            	this.leadBrokerHost = metadata.leader().host();
-        		this.leadBrokerPort = metadata.leader().port();
-        		this.leadBrokerURL = this.leadBrokerHost + ":" + this.leadBrokerPort;
-        		logger.info("Found and Computed leadBrokerURL: {}", leadBrokerURL);
+            	leaderBrokerHost = metadata.leader().host();
+        		leaderBrokerPort = metadata.leader().port();
+        		leaderBrokerURL = leaderBrokerHost + ":" + leaderBrokerPort;
+        		logger.info("Found new leader: leadBrokerURL: {}", leaderBrokerURL);
                 return metadata;
             }
             if (goToSleep) {
@@ -217,8 +229,8 @@ public class KafkaClient {
 	
 	public long getLastestOffset() throws Exception {
 		logger.debug("Getting LastestOffset for topic={}, partition={}, kafkaGroupId={}", 
-				topic, partition, kafkaGroupId);
-		long latestOffset = getOffset(topic, partition, OffsetRequest.LatestTime(), kafkaGroupId);
+				topic, partition, kafkaClientId);
+		long latestOffset = getOffset(topic, partition, OffsetRequest.LatestTime(), kafkaClientId);
 		logger.debug("LatestOffset={}", latestOffset);
 		return latestOffset;
 		
@@ -226,8 +238,8 @@ public class KafkaClient {
 	
 	public long getEarliestOffset() throws Exception {
 		logger.debug("Getting EarliestOffset for topic={}, partition={}, kafkaGroupId={}", 
-				topic, partition, kafkaGroupId);
-		long earliestOffset = this.getOffset(topic, partition, OffsetRequest.EarliestTime(), kafkaGroupId);
+				topic, partition, kafkaClientId);
+		long earliestOffset = this.getOffset(topic, partition, OffsetRequest.EarliestTime(), kafkaClientId);
 		logger.debug("earliestOffset={}" + earliestOffset);
 		return earliestOffset;
 	}
@@ -269,7 +281,7 @@ public class KafkaClient {
 			TopicAndPartition myTopicAndPartition = new TopicAndPartition(topic, partition);
 			topicPartitionList.add(myTopicAndPartition);	
 			OffsetFetchRequest offsetFetchReq = new OffsetFetchRequest(
-					kafkaGroupId, topicPartitionList, versionID, correlationId, kafkaGroupId);
+					kafkaClientId, topicPartitionList, versionID, correlationId, kafkaClientId);
 			OffsetFetchResponse offsetFetchResponse = simpleConsumer.fetchOffsets(offsetFetchReq);
 			long currentOffset = offsetFetchResponse.offsets().get(myTopicAndPartition).offset();
 			//logger.info("Fetched Kafka's currentOffset = " + currentOffset);
@@ -282,12 +294,12 @@ public class KafkaClient {
 	}
 
 
-	FetchResponse getMessagesFromKafka(long offset, int maxSizeBytes) throws Exception {
+	FetchResponse getMessagesFromKafka(long offset) throws Exception {
 		logger.debug("Starting getMessagesFromKafka() ...");
 		try{
 			FetchRequest req = new FetchRequestBuilder()
-				.clientId(kafkaGroupId)
-				.addFetch(topic, partition, offset, maxSizeBytes)
+				.clientId(kafkaClientId)
+				.addFetch(topic, partition, offset, consumerConfig.kafkaFetchSizeMinBytes)
 				.build();
 			FetchResponse fetchResponse = simpleConsumer.fetch(req);
 			return fetchResponse;

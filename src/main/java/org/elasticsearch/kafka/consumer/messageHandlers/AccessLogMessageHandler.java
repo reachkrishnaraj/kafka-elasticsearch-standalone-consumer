@@ -7,12 +7,13 @@ import java.util.TimeZone;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.kafka.consumer.ConsumerConfig;
+import org.elasticsearch.kafka.consumer.MessageHandler;
 import org.elasticsearch.kafka.consumer.mappers.AccessLogMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class AccessLogMessageHandler extends RawMessageStringHandler {
+public class AccessLogMessageHandler extends MessageHandler {
 	
 	private static final Logger logger = LoggerFactory.getLogger(AccessLogMessageHandler.class);
 	private final String actualDateFormat = "dd/MMM/yyyy:hh:mm:ss";
@@ -36,7 +37,7 @@ public class AccessLogMessageHandler extends RawMessageStringHandler {
 	}
 	
 	@Override
-	public byte[] transformMessage( byte[] inputMessage, Long offset) throws Exception {
+	public byte[] transformMessage( byte[] inputMessage, Long offset) throws Exception{
 		String outputMessageStr = this.convertToJson(new String(inputMessage, "UTF-8"), offset);
 		return outputMessageStr.getBytes(); 		
 	}

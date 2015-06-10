@@ -41,7 +41,7 @@ public class KafkaConsumerMain {
         		kafkaConsumerJob.doRun();
         		isConsumeJobInProgress = false;
         		// sleep for configured time
-        		Thread.sleep(kafkaConsumerConfig.consumerSleepTime * 1000);
+        		Thread.sleep(kafkaConsumerConfig.consumerSleepBetweenFetchsMs * 1000);
         		logger.debug("Completed a round of kafka consumer job");
         	} catch (InterruptedException e) {
         		isConsumeJobInProgress = false;
