@@ -21,13 +21,13 @@ public abstract class MessageHandler {
 	private static final Logger logger = LoggerFactory.getLogger(MessageHandler.class);
 	private Client esClient;
 	private ConsumerConfig config;
-	private BulkRequestBuilder bulkReqBuilder;
+	private BulkRequestBuilder bulkRequestBuilder;
 	private IndexHandler indexHandler;
 		
 	public MessageHandler(Client client,ConsumerConfig config) throws Exception{
 		this.esClient = client;
 		this.config = config;
-		this.bulkReqBuilder = null;
+		this.bulkRequestBuilder = null;
 		// instantiate specified in the config IndexHandler class
 		try {
 			indexHandler = (IndexHandler) Class
@@ -54,23 +54,24 @@ public abstract class MessageHandler {
 	}
 
 	public BulkRequestBuilder getBuildReqBuilder() {
-		return bulkReqBuilder;
+		return bulkRequestBuilder;
 	}
 
 	public void setBuildReqBuilder(BulkRequestBuilder bulkReqBuilder) {
-		this.bulkReqBuilder = bulkReqBuilder;
+		this.bulkRequestBuilder = bulkReqBuilder;
 	}
-		
+
+	
 	public boolean postToElasticSearch() throws Exception {
 		BulkResponse bulkResponse = null;
 		BulkItemResponse bulkItemResp = null;
 		//Nothing/NoMessages to post to ElasticSearch
-		if(bulkReqBuilder.numberOfActions() <= 0){
+		if(bulkRequestBuilder.numberOfActions() <= 0){
 			logger.warn("No messages to post to ElasticSearch - returning");
 			return true;
 		}		
 		try{
-			bulkResponse = bulkReqBuilder.execute().actionGet();
+			bulkResponse = bulkRequestBuilder.execute().actionGet();
 		}
 		catch(ElasticsearchException e){
 			logger.error("Failed to post messages to ElasticSearch: " + e.getMessage(), e);
@@ -100,14 +101,14 @@ public abstract class MessageHandler {
 			return false;				
 		}
 		logger.info("Bulk Post to ElasticSearch finished OK");
-		bulkReqBuilder = null;
+		bulkRequestBuilder = null;
 		return true;
 	}
 
 	public abstract byte[] transformMessage(byte[] inputMessage, Long offset) throws Exception;
 	
 	public long prepareForPostToElasticSearch(Iterator<MessageAndOffset> messageAndOffsetIterator){
-		bulkReqBuilder = esClient.prepareBulk();
+		bulkRequestBuilder = esClient.prepareBulk();
 		int numProcessedMessages = 0;
 		int numMessagesInBatch = 0;
 		long offsetOfNextBatch = 0;
@@ -142,6 +143,10 @@ public abstract class MessageHandler {
 			"# of successfully transformed and added to Index messages: {}; offsetOfNextBatch: {}", 
 			numMessagesInBatch, numProcessedMessages, offsetOfNextBatch);
 		return offsetOfNextBatch;
+	}
+
+	public IndexHandler getIndexHandler() {
+		return indexHandler;
 	}
 
 	
