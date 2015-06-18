@@ -2,6 +2,7 @@ package org.elasticsearch.kafka.consumer;
 
 import java.io.InputStream;
 import java.util.Properties;
+import java.io.FileInputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,7 +11,6 @@ public class ConsumerConfig {
 
 	private static final Logger logger = LoggerFactory.getLogger(ConsumerConfig.class);
 	private Properties prop = new Properties();
-	private InputStream input = null;
 	private final int kafkaFetchSizeBytesDefault = 10 * 1024 * 1024;
 
 	// Kafka ZooKeeper's IP Address/HostName : port list
@@ -82,20 +82,14 @@ public class ConsumerConfig {
 	public ConsumerConfig(String configFile) throws Exception {
 		try {
 			logger.info("configFile : " + configFile);
-			input = this.getClass().getClassLoader()
-					.getResourceAsStream(configFile);
+			prop.load(new FileInputStream(configFile));
+	
+			logger.info("Properties : " + prop);
 		} catch (Exception e) {
 			logger.error("Error reading/loading configFile: " + e.getMessage(), e);
 			throw e;
 		}
 
-		if (input == null) {
-			logger.info("Error loading config file - inputStream is null, exiting");
-			throw new Exception("Error loading config file - inputStream is null");
-		}
-
-		// load the properties file
-		prop.load(input);
 		kafkaZookeeperList = (String) prop.getProperty("kafkaZookeeperList", "localhost:2181");
 		zkSessionTimeoutMs = Integer.parseInt(prop.getProperty("zkSessionTimeoutMs", "10000"));
 		zkConnectionTimeoutMs = Integer.parseInt(prop.getProperty("zkConnectionTimeoutMs", "15000"));
@@ -134,7 +128,6 @@ public class ConsumerConfig {
 		consumerSleepBetweenFetchsMs = Integer.parseInt(prop.getProperty(
 				"consumerSleepBetweenFetchsMs", "25"));
 
-		input.close();
 		logger.info("Config reading complete !");
 	}
 
