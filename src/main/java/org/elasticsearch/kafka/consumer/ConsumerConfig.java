@@ -1,8 +1,7 @@
 package org.elasticsearch.kafka.consumer;
 
-import java.io.InputStream;
-import java.util.Properties;
 import java.io.FileInputStream;
+import java.util.Properties;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,6 +69,9 @@ public class ConsumerConfig {
 
 	// Wait time in seconds between consumer job rounds
 	public final int consumerSleepBetweenFetchsMs;
+	
+	//wait time before stop Consumer Job regardless it finished 
+	public final int timeLimitToStopConsumerJob = 10;
 
 	public String getStartOffsetFrom() {
 		return startOffsetFrom;

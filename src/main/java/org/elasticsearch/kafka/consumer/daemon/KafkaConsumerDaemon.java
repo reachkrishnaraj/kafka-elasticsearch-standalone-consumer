@@ -1,5 +1,7 @@
 package org.elasticsearch.kafka.consumer.daemon;
 
+import java.time.LocalDateTime;
+
 import org.apache.commons.daemon.Daemon;
 import org.apache.commons.daemon.DaemonContext;
 import org.apache.commons.daemon.DaemonInitException;
@@ -18,6 +20,7 @@ public class KafkaConsumerDaemon implements Daemon {
 	private boolean stopped = false;
 	public ConsumerJob kafkaConsumerJob = null;
 	private boolean isConsumeJobInProgress = false;
+	private static int timeLimitToStopConsumerJob = 10;
 	
 	@Override
     public void init(DaemonContext daemonContext) throws DaemonInitException, Exception {
@@ -98,22 +101,34 @@ public class KafkaConsumerDaemon implements Daemon {
     }
 	
 	@Override
-    public void stop() throws Exception {
-		logger.info("Received the stop signal, trying to start the Consumer Daemon");
+	 public void stop() throws Exception {
+		logger.info("Received the stop signal, trying to stop the Consumer job");
 		stopped = true;
-        while(isConsumeJobInProgress){
+		
+		LocalDateTime stopTime= LocalDateTime.now();
+
+	
+		
+		while(isConsumeJobInProgress){
         	logger.info(".... Waiting for inprogress Consumer Job to complete ...");
         	Thread.sleep(1000);
+         	LocalDateTime dateTime2= LocalDateTime.now();
+        	if (java.time.Duration.between(stopTime, dateTime2).getSeconds() > timeLimitToStopConsumerJob){
+        		logger.info(".... Consumer Job not responding for " + timeLimitToStopConsumerJob +" seconds - stopping the job");
+        		break;
+        	}
+       
         }
-        logger.info("Completed waiting for inprogess Consumer Job to finish. Stopping the Consumer....");
+        logger.info("Completed waiting for inprogess Consumer Job to finish - stopping the job");
         try{
         	kafkaConsumerJob.stop();
         }
         catch(Exception e){
+        	logger.error("********** Exception when trying to stop the Consumer Job: " + 
+        			e.getMessage(), e);
 			e.printStackTrace();
-			logger.error("Exception when stopping the Consumer Daemon: " + e.getMessage(), e);
         }
-        logger.info("Stopped the Consumer Job");        
+        logger.info("Stopped the Consumer Job");
     }
 	
 	@Override
