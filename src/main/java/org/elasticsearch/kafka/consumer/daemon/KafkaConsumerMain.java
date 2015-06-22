@@ -1,5 +1,7 @@
 package org.elasticsearch.kafka.consumer.daemon;
 
+import java.time.LocalDateTime;
+
 import org.elasticsearch.kafka.consumer.ConsumerConfig;
 import org.elasticsearch.kafka.consumer.ConsumerJob;
 import org.slf4j.Logger;
@@ -62,9 +64,20 @@ public class KafkaConsumerMain {
     public void stop() throws Exception {
 		logger.info("Received the stop signal, trying to stop the Consumer job");
 		stopped = true;
-        while(isConsumeJobInProgress){
+		
+		LocalDateTime stopTime= LocalDateTime.now();
+
+	
+		
+		while(isConsumeJobInProgress){
         	logger.info(".... Waiting for inprogress Consumer Job to complete ...");
         	Thread.sleep(1000);
+         	LocalDateTime dateTime2= LocalDateTime.now();
+        	if (java.time.Duration.between(stopTime, dateTime2).getSeconds() > kafkaConsumerConfig.timeLimitToStopConsumerJob){
+        		logger.info(".... Consumer Job not responding for " + kafkaConsumerConfig.timeLimitToStopConsumerJob +" seconds - stopping the job");
+        		break;
+        	}
+       
         }
         logger.info("Completed waiting for inprogess Consumer Job to finish - stopping the job");
         try{
