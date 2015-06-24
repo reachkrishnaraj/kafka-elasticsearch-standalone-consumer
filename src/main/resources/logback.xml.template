@@ -1,0 +1,57 @@
+<configuration>
+
+	<property name="LOG_DIR" value="/tmp"/>
+	<property name="MAX_HISTORY_MAIN_LOG" value="10"/>
+	<property name="MAX_SIZE_MAIN_LOG" value="10KB"/>
+	<property name="MAX_HISTORY_FAILED_LOG" value="5"/>
+	<property name="MAX_SIZE_FAILED_LOG" value="10MB"/>
+
+	<appender name="STDOUT"
+		class="ch.qos.logback.core.ConsoleAppender">
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			<pattern>%d{dd/MMM/yyyy:HH:mm:ss:SSS Z} [%thread] %-5level %logger{36} - %msg%n</pattern>
+		</layout>
+	</appender>
+
+    <appender name="MAIN_LOGS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/kafka_es_consumer.log</file>
+        <append>true</append>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- rollover daily -->
+            <fileNamePattern>${LOG_DIR}/kafka_es_consumer-%d{yyyyMMddHH}.%i.log.gz</fileNamePattern>
+            <!-- keep ${MAX_HISTORY_MAIN_LOG} days' worth of history -->
+            <maxHistory>${MAX_HISTORY_MAIN_LOG}</maxHistory>
+            <!-- or whenever the file size reaches ${MAX_SIZE_MAIN_LOG} -->
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>${MAX_SIZE_MAIN_LOG}</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+        </rollingPolicy>
+        <encoder>
+	        <pattern>%d{yyyy-MM-dd HH:mm:ss:SSS,SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+	<appender name="FAILED_EVENTS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+		<file>${LOG_DIR}/failed_es_events.log</file>
+        <append>true</append>
+	    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+	      <!-- rollover daily -->
+	      <fileNamePattern>failed_es_events-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+	      <maxHistory>${MAX_HISTORY_FAILED_LOG}</maxHistory> 
+	      <timeBasedFileNamingAndTriggeringPolicy
+	            class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+	        <!-- or whenever the file size reaches max size -->
+	        <maxFileSize>${MAX_SIZE_FAILED_LOG}</maxFileSize>
+	      </timeBasedFileNamingAndTriggeringPolicy>
+	    </rollingPolicy>
+        <encoder>
+			<pattern>[%d{dd/MMM/yyyy:HH:mm:ss:SSS Z}] %msg%n</pattern>
+        </encoder>
+	</appender>
+
+    <root level="info" additivity="false">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="MAIN_LOGS"/>
+    </root>
+
+</configuration>

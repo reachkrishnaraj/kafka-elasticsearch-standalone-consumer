@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<name>kafka-elasticsearch-standalone-consumer</name>
+	<name>kafka-es-consumer</name>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.elasticsearch.kafka.consumer</groupId>
-	<artifactId>kafka-elasticsearch-standalone-consumer</artifactId>
-	<version>0.1</version>
+	<artifactId>kafka-es-consumer</artifactId>
+	<version>0.2</version>
 	<packaging>jar</packaging>
 	<description>Kafka standalone consumer for elasticsearch</description>
 	<inceptionYear>2014</inceptionYear>
@@ -17,14 +17,14 @@
 		</license>
 	</licenses>
 	<properties>
-		<elasticsearch.version>1.0.0</elasticsearch.version>
+		<elasticsearch.version>1.5.1</elasticsearch.version>
 	</properties>
 	<pluginRepositories>
-        <pluginRepository>
-            <id>onejar-maven-plugin.googlecode.com</id>
-            <url>http://onejar-maven-plugin.googlecode.com/svn/mavenrepo</url>
-        </pluginRepository>
-    </pluginRepositories>
+		<pluginRepository>
+			<id>onejar-maven-plugin.googlecode.com</id>
+			<url>http://onejar-maven-plugin.googlecode.com/svn/mavenrepo</url>
+		</pluginRepository>
+	</pluginRepositories>
 
 	<dependencies>
 		<dependency>
@@ -42,7 +42,7 @@
 		<dependency>
 			<groupId>org.apache.kafka</groupId>
 			<artifactId>kafka_2.10</artifactId>
-			<version>0.8.1</version>
+			<version>0.8.2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.netflix.curator</groupId>
@@ -128,83 +128,81 @@
 			<artifactId>commons-daemon</artifactId>
 			<version>1.0.15</version>
 		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.1.3</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-core</artifactId>
+			<version>1.1.3</version>
+		</dependency>
+
 	</dependencies>
 	<build>
 		<directory>bin</directory>
-    	<outputDirectory>${project.build.directory}/classes</outputDirectory>
+		<outputDirectory>${project.build.directory}/classes</outputDirectory>
 		<plugins>
-            <plugin>
-		<groupId>org.apache.maven.plugins</groupId>
-		<artifactId>maven-jar-plugin</artifactId>
-		<configuration>
-			<archive>
-			  <manifest>
-				<addClasspath>true</addClasspath>
-				<mainClass>org.elasticsearch.kafka.consumer.daemon.KafkaConsumerDaemon</mainClass>
-				<classpathPrefix>dep-jars/</classpathPrefix>
-			  </manifest>
-			</archive>
-		</configuration>
-	  </plugin>
-            <plugin>
-		<groupId>org.apache.maven.plugins</groupId>
-		<artifactId>maven-dependency-plugin</artifactId>
-		<version>2.5.1</version>
-		<executions>
-		  <execution>
-			<id>copy-dependencies</id>
-			<phase>package</phase>
-			<goals>
-				<goal>copy-dependencies</goal>
-			</goals>
-			<configuration>
-				<!-- <includeGroupIds>log4j</includeGroupIds> -->
-				<outputDirectory>${project.build.directory}/dep-jars/</outputDirectory>
-			</configuration>
-		  </execution>
-		 </executions>
-		</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>2.3</version>
+				<executions>
+					<!-- Run shade goal on package phase -->
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<transformers>
+								<!-- add Main-Class to manifest file -->
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>org.elasticsearch.kafka.consumer.daemon.KafkaConsumerMain</mainClass>
+
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>2.8</version>
+				<executions>
+					<execution>
+						<id>copy-dependencies</id>
+						<phase>package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<!-- <includeGroupIds>log4j</includeGroupIds> -->
+							<outputDirectory>${project.build.directory}/dep-jars/</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
-					<source>1.7</source>
-					<target>1.7</target>
+					<source>1.8</source>
+					<target>1.8</target>
 				</configuration>
 			</plugin>
-			<!-- <plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-source-plugin</artifactId>
-				<version>2.1.2</version>
-				<executions>
-					<execution>
-						<id>attach-sources</id>
-						<goals>
-							<goal>jar</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin> -->
-			<!-- <plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>2.3</version>
-				<configuration>
-					<appendAssemblyId>false</appendAssemblyId>
-					<outputDirectory>${project.build.directory}/releases/</outputDirectory>
-					<descriptors>
-						<descriptor>${basedir}/src/main/assemblies/plugin.xml</descriptor>
-					</descriptors>
-				</configuration>
-				<executions>
-					<execution>
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin> -->
+			<!-- <plugin> <groupId>org.apache.maven.plugins</groupId> <artifactId>maven-source-plugin</artifactId> 
+				<version>2.1.2</version> <executions> <execution> <id>attach-sources</id> 
+				<goals> <goal>jar</goal> </goals> </execution> </executions> </plugin> -->
+			<!-- <plugin> <artifactId>maven-assembly-plugin</artifactId> <version>2.3</version> 
+				<configuration> <appendAssemblyId>false</appendAssemblyId> <outputDirectory>${project.build.directory}/releases/</outputDirectory> 
+				<descriptors> <descriptor>${basedir}/src/main/assemblies/plugin.xml</descriptor> 
+				</descriptors> </configuration> <executions> <execution> <phase>package</phase> 
+				<goals> <goal>single</goal> </goals> </execution> </executions> </plugin> -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-surefire-plugin</artifactId>
