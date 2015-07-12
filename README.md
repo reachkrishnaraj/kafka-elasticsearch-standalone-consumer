@@ -29,28 +29,52 @@
 
 * This way, there is a clear way of subscribing and processing messages from multiple partitions across multiple topics using this Stand alone Consumer.
 
-# How to use ?
+# How to use ? 
+
+### Method 1: running as a standard Jar 
+
+**1. Download the code into a `$CONSUMER_HOME` dir.
+
+**2. cp `$CONSUMER_HOME`/src/main/resources/kafkaESConsumer.properties.template /your/absolute/path/kafkaESConsumer.properties file - update all relevant properties as explained in the comments
+
+**3. cp `$CONSUMER_HOME`/src/main/resources/logback.xml.template /your/absolute/path/logback.xml
+
+ specify directory you want to store logs in:
+	<property name="LOG_DIR" value="/tmp"/>
+	
+ adjust values of max sizes and number of log files as needed
+
+**4. build/create the app jar:
+
+		cd $CONSUMER_HOME
+     	mvn clean package
+     	
+	The kafka-es-consumer-0.2.jar will be created in the $CONSUMER_HOME/bin, with all dependencies included into the JAR
+
+**5. run the app [use JDK1.8] :  
+
+		java -Dlogback.configurationFile=/your/absolute/path/logback.xml -jar $CONSUMER_HOME/bin/kafka-es-consumer-0.2.jar /your/absolute/path/kafkaESConsumer.properties
+
+ 
+
+### Method 2: running via JSVC as a Daemon
 
 **1. Download the code. Let's say, `$CONSUMER_HOME` contains the code.**
 
-**2. From the `$CONSUMER_HOME`, build the maven project.** - _this step will create the JAR file of the Consumer and the dependency files in the ` $CONSUMER_HOME/bin ` directory_
+**2. From the `$CONSUMER_HOME`, build the maven project.** - _this step will create the JAR file with all Consumer dependencies inside, in the ` $CONSUMER_HOME/bin ` directory_
 
     mvn clean package
 
-**3. Create a config file for the Consumer Instance and provide all necessary properties.** - _Use the existing Config file `$CONSUMER_HOME/config/kafkaESConsumer.properties` as template._
+**3. Create a config file for the Consumer Instance and provide all necessary properties.** - _Use the existing Config file `$CONSUMER_HOME`/src/main/resources/kafkaESConsumer.properties.template` as template._
 
-    cp $CONSUMER_HOME/config/kafkaESConsumer.properties $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
+    cp $CONSUMER_HOME/src/main/resources/kafkaESConsumer.properties $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties
 
-    vi $CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties - Edit & provide the correct config details.
+    vi $CONSUMER_HOME/src/main/resources/<consumerGroupName><topicName><PartitionNum>.properties - Edit & provide the correct config details.
 
 
+_These files will be copied into the $CONSUMER_HOME/bin/classes/ dir after the build._
 _The details & guide for each property in the config file is given in the property file itself._
 
-_It is **IMPORTANT to SPECIFY 1 UNIQUE LOG PROPERTY FILE(using the below property) FOR EACH CONSUMER INSTANCE** in the respective config file to have logging happen in separate log file for each consumer instance._
-
-
-    #Log property file for the consumer instance. One instance of consumer should have 1 log file.
-    logPropertyFile=log4j<consumerGroupName><topicName><PartitionNum>.properties
 
 **4. Start the Consumer as follows:**
 
@@ -91,9 +115,6 @@ _The below log file contains ERROR during starting, restarting & stopping the Co
 
 **6. Monitor the processing in the log file defined by the following property in the Consumer's Respective Config file.**
 
-(i.e: in this example, `$CONSUMER_HOME/config/<consumerGroupName><topicName><PartitionNum>.properties`)
-
-    Property/Config name: logPropertyFile
 
 **7. To Stop the Consumer Instance:**
 
@@ -109,9 +130,9 @@ _The below log file contains ERROR during starting, restarting & stopping the Co
 
 # Versions:
 
-### Kafka Version: 0.8.1
+### Kafka Version: 0.8.2.1
 
-### ElasticSearch: > 1.0.0 (Works great for 1.3.4 as well in my Production)
+### ElasticSearch: > 1.5.1
 
 ### Scala Version for Kafka Build: 2.10.0
 
@@ -119,19 +140,27 @@ _The below log file contains ERROR during starting, restarting & stopping the Co
 
 The details of each config property can be seen in the template file (below)
 
-[Config File with details about each property](https://github.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/blob/master/config/kafkaESConsumer.properties)
+[Config File with details about each property](https://github.com/ppine7/kafka-elasticsearch-standalone-consumer/blob/master/src/main/resources/kafkaESConsumer.properties)
 
 # Message Handler Class
 
-* If the message in your Kafka has to handled in Raw `UTF-8` text, then you can use message handler class `org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler`
+*  `org.elasticsearch.kafka.consumer.MessageHandler` is an Abstract class that has most of the functionality of reading data from Kafka and batch-indexing into ElasticSearch already implemented. It has one abstract method, `transformMessage()`, that can be overwritten in the concrete sub-classes to customize message transformation before posting into ES
 
-* You can code your own Message Handler class by extending the abstract class `org.elasticsearch.kafka.consumer.MessageHandler` and implementing the methods: `transformMessage()` & `prepareForPostToElasticSearch()`.
-
-* Also, if the message in your Kafka has to handled in Raw `UTF-8` text and you just want to change the way the raw message is transformed(into your desired format), then extend the `org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler` class and override/implement the `transformMessage()` method alone. An example can be found here: `org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler`
+* `org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler` is a simple concrete sub-class of the MessageHAndler that sends messages into ES with no additional transformation, as is, in the 'UTF-8' format
 
 * Usually, its effective to Index the message in JSON format in ElasticSearch. This can be done using a Mapper Class and transforming the message from Kafka by overriding/implementing the `transformMessage()` method. An example can be found here: `org.elasticsearch.kafka.consumer.messageHandlers.AccessLogMessageHandler`
 
 * _**Do remember to set the newly created message handler class in the `messageHandlerClass` config property of the consumer instance.**_
+
+# IndexHandler Interface and basic implementation
+
+*  `org.elasticsearch.kafka.consumer.IndexHandler` is an interface that defines two methods: getIndexName(params) and getIndexType(params). 
+
+* `org.elasticsearch.kafka.consumer.BasicIndexHandler` is a simple imlementation of this interface that returnes indexName and indexType values as configured in the kafkaESConsumer.properties file. 
+
+* one might want to create a custom implementation of IndexHandler if, for example, index name and type are not static for all incoming messages but depend on the event data - for example customerId, orderId, etc. In that case, pass all info that is required to perform that custom index determination logic as a Map of parameters into the getIndexName(params) and getIndexType(params) methods (or pass NULL if no such data is required)
+
+* _**Do remember to set the index handler class in the `indexHandlerClass` property in the kafkaESConsumer.properties file. By default, BasicIndexHandler is used**_
 
 # License
 

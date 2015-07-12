@@ -1,0 +1,99 @@
+### Zookeeper properties ####################################
+# Zookeeper's host:port list: <host1>:<port1>,…,<hostN>:<portN>
+# default value: localhost:2181, if not specified
+kafkaZookeeperList=localhost:2181
+
+# Zookeeper session timeout in MS
+zkSessionTimeoutMs=10000
+
+# Zookeeper connection timeout in MS
+zkConnectionTimeoutMs=15000
+
+# Zookeeper number of retries when creating a curator client
+zkCuratorRetryTimes=3
+
+# Zookeeper: time in ms between re-tries when creating a Curator
+zkCuratorRetryDelayMs=2000
+
+### Kafka properties ####################################
+# Kafka Brokers host:port list: <host1>:<port1>,…,<hostN>:<portN>
+# default: localhost:9092
+kafkaBrokersList=localhost:9092
+
+# Kafka Consumer group name
+# default: ESKafkaConsumerClient
+consumerGroupName=ESKafkaConsumerClient
+
+# Kafka Topic from which the message has to be processed
+# mandatory property, no default value specified.
+topic=my_log_topic
+
+# Partition in the Kafka's Topic(defined by 'topic' property) from which the message has to be processed.
+# One instance of this consumer read and process from only 1 partition(of the topic)
+# default: 0
+partition=0
+
+# Offset option from where the message fetching should happen in kafka
+# Values can be: CUSTOM / EARLIEST / LATEST / RESTART.
+# CUSTOM:  Message from the specified(defined by 'startOffset' property) offset in Kafka will be read. If 'CUSTOM' is set, then 'startOffset' property has to be set an integer value
+# EARLIEST:  Messages from the earliest available offset in kafka will be read
+# LATEST:  Messages from the latest available offset in kafka will be read
+# RESTART: Message reading will happen from the Offset where the last cycle of reading by this client has stopped
+# Default:"EARLIEST"
+startOffsetFrom=RESTART
+
+# integer value of the offset from where the message processing should happen. Use this property in conjunction with 'startOffsetFrom=CUSTOM'
+# mandatory property when 'startOffsetFrom' is set to 'CUSTOM', no default value specified.
+startOffset=0
+
+# Kafka FetchRequest's minBytes value 
+# Default: "31457280(bytes), i.e:(10 * 1024 * 1024 * 3)"
+# Set it to ~4MB and slowly rampup based in your heap memory.
+kafkaFetchSizeMinBytes=31457280
+
+# Kafka SimpleConsumer socket bufferSize
+kafkaSimpleConsumerBufferSizeBytes=31457280
+# Kafka SimpleConsumer socket timeout in MS
+kafkaSimpleConsumerSocketTimeoutMs=10000
+
+
+### ElasticSearch properties ####################################
+# ElasticSearch Host and Port List for all the nodes
+# Example: esHostPortList=machine_1_ip:9300,machine_2_ip:9300
+esHostPortList=localhost:9300
+
+# Name of the ElasticSearch Cluster that messages will be posted to;
+# Tip: Its not a good idea to use the default name "ElasticSearch" as your cluster name. 
+esClusterName=KafkaESCluster
+
+# ES Index Name that messages will be posted/indexed to; this can be customized via using a custom IndexHandler implementation class
+# Default: "kafkaESIndex"
+esIndex=kafkaESIndex
+
+# ES Index Type that messages will be posted/indexed to; this can be customized via using a custom IndexHandler implementation class 
+# Default: “kafkaESType” 
+esIndexType=kafkaESType
+
+# Fully qualified name of a concrete message handler class
+# Default: "org.elasticsearch.kafka.consumer.RawMessageStringHandler"
+# Custom class should be extended from org.elasticsearch.kafka.consumer.MessageHandler class
+messageHandlerClass=org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler
+
+# Fully qualified name of a custom IndexHandler implementation class
+# Default: org.elasticsearch.kafka.consumer.BasicIndexHandler
+indexHandlerClass=org.elasticsearch.kafka.consumer.BasicIndexHandler
+
+
+# Preferred message encoding to process the message before posting it to ElasticSearch.
+# Default: "UTF-8" 
+messageEncoding=UTF-8
+
+# Dry runs will not post to elasticsearch and won’t commit the offset to Kafka
+isDryRun=false
+
+# Time in ms for the consumer to sleep between each round of reading events from Kafka
+consumerSleepBetweenFetchsMs=10
+
+# flag to enable/disable performance timings reporting; Set it to true when performance/load-testing your app, set to ‘false’ when deploying in production as it will affect performance of the app; defaults to ‘false'
+isPerfReportingEnabled=false
+

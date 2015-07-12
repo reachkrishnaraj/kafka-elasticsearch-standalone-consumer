@@ -1,0 +1,8 @@
+/bin/
+.project
+.settings/
+/logs/
+
+
+kafkaESConsumerLocal.properties
+dependency-reduced-pom.xml
