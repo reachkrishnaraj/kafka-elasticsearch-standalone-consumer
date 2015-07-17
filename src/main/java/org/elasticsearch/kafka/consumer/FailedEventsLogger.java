@@ -11,12 +11,12 @@ public class FailedEventsLogger {
 		logger.error("General Error Processing Event: ERROR: {}, EVENT: {}", errorMsg, event);
 	}
 
-	public static void logFailedToPostToESEvent(String errorMsg, String event){
-		logger.error("Error posting event to ES: ERROR: {}, EVENT: {}", errorMsg, event);
+	public static void logFailedToPostToESEvent(String restResponse, String errorMsg){
+		logger.error("Error posting event to ES: REST response: {}, ERROR: {}", restResponse, errorMsg);
 	}
 
 	public static void logFailedToTransformEvent(long offset, String errorMsg, String event){
-		logger.error("Error transforming event: ERROR: {}, OFFSET: {}, EVENT: {}", 
+		logger.error("Error transforming event: OFFSET: {}, ERROR: {}, EVENT: {}", 
 				offset, errorMsg, event);
 	}
 
