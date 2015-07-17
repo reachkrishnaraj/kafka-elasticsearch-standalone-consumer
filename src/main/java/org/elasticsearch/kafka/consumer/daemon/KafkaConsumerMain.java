@@ -96,12 +96,11 @@ public class KafkaConsumerMain {
 
     	Runtime.getRuntime().addShutdownHook(new Thread() {
   	      public void run() {
-  	        System.out.println("Running Shutdown Hook .... ");
+  	        logger.info("Running Shutdown Hook .... ");
   	        try {
 					driver.stop();
 				} catch (Exception e) {
-					System.out.println("Error stopping the Consumer from the ShutdownHook: " + e.getMessage());
-					e.printStackTrace();
+					logger.error("Error stopping the Consumer from the ShutdownHook: " + e.getMessage());
 				}
   	      }
   	   });
@@ -110,7 +109,7 @@ public class KafkaConsumerMain {
 			driver.init(args);
 			driver.start();
 		} catch (Exception e) {
-			System.out.println("Exception from main() - exiting: " + e.getMessage());
+			logger.error("Exception from main() - exiting: " + e.getMessage());
 		}
     	
     	

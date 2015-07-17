@@ -138,6 +138,11 @@
 			<artifactId>logback-core</artifactId>
 			<version>1.1.3</version>
 		</dependency>
+		<dependency>
+			<groupId>org.codehaus.janino</groupId>
+			<artifactId>janino</artifactId>
+			<version>2.7.8</version>
+		</dependency>
 
 	</dependencies>
 	<build>
@@ -147,7 +152,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>2.3</version>
+				<version>2.4.1</version>
 				<executions>
 					<!-- Run shade goal on package phase -->
 					<execution>
@@ -164,6 +169,16 @@
 
 								</transformer>
 							</transformers>
+							<filters>
+							   <filter>
+							     <artifact>*:*</artifact>
+							     <excludes>
+							       <exclude>META-INF/*.SF</exclude>
+							       <exclude>META-INF/*.DSA</exclude>
+							       <exclude>META-INF/*.RSA</exclude>
+							     </excludes>
+							   </filter>
+							 </filters>
 						</configuration>
 					</execution>
 				</executions>
@@ -181,7 +196,7 @@
 						</goals>
 						<configuration>
 							<!-- <includeGroupIds>log4j</includeGroupIds> -->
-							<outputDirectory>${project.build.directory}/dep-jars/</outputDirectory>
+                			<outputDirectory>${project.build.directory}/dep-jars/</outputDirectory>
 						</configuration>
 					</execution>
 				</executions>

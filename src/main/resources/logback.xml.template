@@ -1,10 +1,24 @@
 <configuration>
 
+	<!-- PLEASE set to values appropriate for YOUR environment -->
+	<!-- example properties for your reference -->
+  	<property name="ENVIRONMENT" value="development"/>
 	<property name="LOG_DIR" value="/tmp"/>
 	<property name="MAX_HISTORY_MAIN_LOG" value="10"/>
 	<property name="MAX_SIZE_MAIN_LOG" value="10KB"/>
 	<property name="MAX_HISTORY_FAILED_LOG" value="5"/>
 	<property name="MAX_SIZE_FAILED_LOG" value="10MB"/>
+	<!-- end of example properties -->
+	
+	<!-- please substitute tokens with the values suitable for your env -->
+	<property name="ENVIRONMENT" value="<%= @logback_environment %>"/>
+	<property name="LOG_DIR" value="<%= @logback_logdir %>"/>
+	<property name="MAX_HISTORY_MAIN_LOG" value="<%= @logback_maxhistorymainlog %>"/>
+	<property name="MAX_SIZE_MAIN_LOG" value="<%= @logback_maxsize %>"/>
+	<property name="MAX_HISTORY_FAILED_LOG" value="<%= @logback_maxhistoryfailed %>"/>
+	<property name="MAX_SIZE_FAILED_LOG" value="<%= @logback_maxsizefailed %>"/>
+	<!-- end of properties that need adjustment -->
+	
 
 	<appender name="STDOUT"
 		class="ch.qos.logback.core.ConsoleAppender">
@@ -49,9 +63,16 @@
         </encoder>
 	</appender>
 
-    <root level="info" additivity="false">
-        <appender-ref ref="STDOUT"/>
-        <appender-ref ref="MAIN_LOGS"/>
-    </root>
+    <logger name="org.elasticsearch.kafka.consumer.FailedEventsLogger" level="error">
+        <appender-ref ref="FAILED_EVENTS" />
+    </logger>
+   <logger name="org.elasticsearch.kafka" level="info">
+     <appender-ref ref="MAIN_LOGS" />
+ 	 <if condition='property("ENVIRONMENT").contains("development")'>
+    	<then>
+    		<appender-ref ref="STDOUT" />
+		</then>
+  	 </if>
+   </logger>
 
 </configuration>
