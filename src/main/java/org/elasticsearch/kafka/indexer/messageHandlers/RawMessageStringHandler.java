@@ -1,8 +1,8 @@
-package org.elasticsearch.kafka.consumer.messageHandlers;
+package org.elasticsearch.kafka.indexer.messageHandlers;
 
 import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.kafka.consumer.ConsumerConfig;
-import org.elasticsearch.kafka.consumer.MessageHandler;
+import org.elasticsearch.kafka.indexer.ConsumerConfig;
+import org.elasticsearch.kafka.indexer.MessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

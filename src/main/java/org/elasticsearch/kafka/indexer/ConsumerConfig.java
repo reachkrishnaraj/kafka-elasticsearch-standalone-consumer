@@ -1,4 +1,4 @@
-package org.elasticsearch.kafka.consumer;
+package org.elasticsearch.kafka.indexer;
 
 import java.io.FileInputStream;
 import java.util.Properties;
@@ -30,8 +30,11 @@ public class ConsumerConfig {
 	public final String kafkaBrokersList;
 	// Kafka Topic from which the message has to be processed
 	public final String topic;
-	// Partition in the Kafka Topic from which the message has to be processed
-	public final short partition;
+	// the below two parameters define the range of partitions to be processed by this app
+	// first partition in the Kafka Topic from which the messages have to be processed
+	public final short firstPartition;
+	// last partition in the Kafka Topic from which the messages have to be processed
+	public final short lastPartition;
 	// Option from where the message fetching should happen in Kafka
 	// Values can be: CUSTOM/EARLIEST/LATEST/RESTART.
 	// If 'CUSTOM' is set, then 'startOffset' has to be set as an int value
@@ -70,8 +73,10 @@ public class ConsumerConfig {
 	// Wait time in seconds between consumer job rounds
 	public final int consumerSleepBetweenFetchsMs;
 	
-	//wait time before stop Consumer Job regardless it finished 
+	//wait time before force-stopping Consumer Job 
 	public final int timeLimitToStopConsumerJob = 10;
+	//timeout in seconds before force-stopping Indexer app and all indexer jobs 
+	public final int appStopTimeoutSeconds;
 
 	public String getStartOffsetFrom() {
 		return startOffsetFrom;
@@ -104,7 +109,8 @@ public class ConsumerConfig {
 						"org.elasticsearch.kafka.consumer.BasicIndexHandler");
 		kafkaBrokersList = prop.getProperty("kafkaBrokersList", "localhost:9092");
 		topic = prop.getProperty("topic", "");
-		partition = Short.parseShort(prop.getProperty("partition", "0"));
+		firstPartition = Short.parseShort(prop.getProperty("firstPartition", "0"));
+		lastPartition = Short.parseShort(prop.getProperty("lastPartition", "3"));
 		startOffsetFrom = prop.getProperty("startOffsetFrom", "0");
 		startOffset = Integer.parseInt(prop.getProperty("startOffset", "LATEST"));
 		consumerGroupName = prop.getProperty("consumerGroupName", "ESKafkaConsumerClient");
@@ -129,6 +135,8 @@ public class ConsumerConfig {
 		isDryRun = prop.getProperty("isDryRun", "false");
 		consumerSleepBetweenFetchsMs = Integer.parseInt(prop.getProperty(
 				"consumerSleepBetweenFetchsMs", "25"));
+		appStopTimeoutSeconds = Integer.parseInt(prop.getProperty(
+				"appStopTimeoutSeconds", "10"));
 
 		logger.info("Config reading complete !");
 	}

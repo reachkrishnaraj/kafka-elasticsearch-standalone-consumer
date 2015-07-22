@@ -1,4 +1,4 @@
-package org.elasticsearch.kafka.consumer;
+package org.elasticsearch.kafka.indexer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,9 +35,9 @@ public class KafkaClient {
 	private static final Logger logger = LoggerFactory.getLogger(KafkaClient.class);
 	private CuratorFramework curator;
 	private SimpleConsumer simpleConsumer;
-	String kafkaClientId;
+	private String kafkaClientId;
 	String topic;
-	int partition;
+	private final int partition;
 	private String leaderBrokerHost;
 	private int leaderBrokerPort;
 	private String leaderBrokerURL;
@@ -45,18 +45,18 @@ public class KafkaClient {
 	private String[] kafkaBrokersArray;
 
 	
-	public KafkaClient(final ConsumerConfig config, String kafkaGroupId) throws Exception {
+	public KafkaClient(final ConsumerConfig config, String kafkaClientId, int partition) throws Exception {
 		logger.info("Instantiating KafkaClient");
 		this.consumerConfig = config;
 		
 		this.topic = config.topic;
-		this.kafkaClientId = kafkaGroupId;
-		this.partition = config.partition;
+		this.kafkaClientId = kafkaClientId;
+		this.partition = partition;
 		kafkaBrokersArray = config.kafkaBrokersList.trim().split(",");
 		logger.info("### KafkaClient Config: ###");
 		logger.info("kafkaZookeeperList: {}", config.kafkaZookeeperList);
 		logger.info("kafkaBrokersList: {}", config.kafkaBrokersList);
-		logger.info("kafkaGroupId: {}", kafkaGroupId);
+		logger.info("kafkaClientId: {}", kafkaClientId);
 		logger.info("topic: {}", topic);
 		logger.info("partition: {}", partition);
 		connectToZooKeeper();
@@ -65,7 +65,7 @@ public class KafkaClient {
 		
 	}
 			
-	void connectToZooKeeper() throws Exception {
+	public void connectToZooKeeper() throws Exception {
 		try {
 			curator = CuratorFrameworkFactory.newClient(consumerConfig.kafkaZookeeperList, 
 					consumerConfig.zkSessionTimeoutMs, consumerConfig.zkConnectionTimeoutMs,
@@ -106,7 +106,7 @@ public class KafkaClient {
 			mapForCommitOffset.put(tp, offsetMetaAndErr);
 			kafka.javaapi.OffsetCommitRequest offsetCommitReq = new kafka.javaapi.OffsetCommitRequest(
 					kafkaClientId, mapForCommitOffset, correlationId, kafkaClientId, versionID);
-			OffsetCommitResponse offsetCommitResp = this.simpleConsumer.commitOffsets(offsetCommitReq);
+			OffsetCommitResponse offsetCommitResp = simpleConsumer.commitOffsets(offsetCommitReq);
 			logger.debug("Completed OffsetSet commit. OffsetCommitResponse ErrorCode = {} ", offsetCommitResp.errors().get(tp)+ " Returning to the caller.");
 			return (Short) offsetCommitResp.errors().get(tp);
 		}
@@ -148,7 +148,7 @@ public class KafkaClient {
 			List<TopicMetadata> metaData = resp.topicsMetadata();
 			for (TopicMetadata item : metaData) {
 				for (PartitionMetadata part : item.partitionsMetadata()) {
-					if (part.partitionId() == this.partition) {
+					if (part.partitionId() == partition) {
 						//System.out.println("ITS TRUE");
 						currentPartitionMetaData = part;
 					break;
@@ -172,17 +172,7 @@ public class KafkaClient {
 					kafkaBrokerHost + "], topic=[" + topic + "], partition=[" + partition + 
 					"]: currentPartitionMetadata is null");
 			
-		}
-
-		/*
-		List<String> m_replicaBrokers = new ArrayList<>();
-		if (returnMetaData != null) {
-			for (kafka.cluster.Broker replica : returnMetaData.replicas()) {
-				m_replicaBrokers.add(replica.host());
-			}
-		}
-		/*  */
-		
+		}		
 		leaderBrokerHost = currentPartitionMetaData.leader().host();
 		leaderBrokerPort = currentPartitionMetaData.leader().port();
 		leaderBrokerURL = leaderBrokerHost + ":" + leaderBrokerPort;
@@ -209,9 +199,6 @@ public class KafkaClient {
                 //
                 goToSleep = true;
             } else {
-            	leaderBrokerHost = metadata.leader().host();
-        		leaderBrokerPort = metadata.leader().port();
-        		leaderBrokerURL = leaderBrokerHost + ":" + leaderBrokerPort;
         		logger.info("Found new leader: leadBrokerURL: {}", leaderBrokerURL);
                 return metadata;
             }
@@ -240,7 +227,7 @@ public class KafkaClient {
 		logger.debug("Getting EarliestOffset for topic={}, partition={}, kafkaGroupId={}", 
 				topic, partition, kafkaClientId);
 		long earliestOffset = this.getOffset(topic, partition, OffsetRequest.EarliestTime(), kafkaClientId);
-		logger.debug("earliestOffset={}" + earliestOffset);
+		logger.debug("earliestOffset={}", earliestOffset);
 		return earliestOffset;
 	}
 	
@@ -294,7 +281,7 @@ public class KafkaClient {
 	}
 
 
-	FetchResponse getMessagesFromKafka(long offset) throws Exception {
+	public FetchResponse getMessagesFromKafka(long offset) throws Exception {
 		logger.debug("Starting getMessagesFromKafka() ...");
 		try{
 			FetchRequest req = new FetchRequestBuilder()
@@ -310,7 +297,7 @@ public class KafkaClient {
 		}
 	}
 	
-	ByteBufferMessageSet fetchMessageSet(FetchResponse fetchReponse){
+	public ByteBufferMessageSet fetchMessageSet(FetchResponse fetchReponse){
 		return fetchReponse.messageSet(topic, partition);
 	}
 	

@@ -28,11 +28,11 @@
 	</appender>
 
     <appender name="MAIN_LOGS" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_DIR}/kafka_es_consumer.log</file>
+        <file>${LOG_DIR}/kafka_es_indexer.log</file>
         <append>true</append>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- rollover daily -->
-            <fileNamePattern>${LOG_DIR}/kafka_es_consumer-%d{yyyyMMddHH}.%i.log.gz</fileNamePattern>
+            <fileNamePattern>${LOG_DIR}/kafka_es_indexer-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <!-- keep ${MAX_HISTORY_MAIN_LOG} days' worth of history -->
             <maxHistory>${MAX_HISTORY_MAIN_LOG}</maxHistory>
             <!-- or whenever the file size reaches ${MAX_SIZE_MAIN_LOG} -->
@@ -50,7 +50,7 @@
         <append>true</append>
 	    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
 	      <!-- rollover daily -->
-	      <fileNamePattern>failed_es_events-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+	      <fileNamePattern>${LOG_DIR}/failed_es_events-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
 	      <maxHistory>${MAX_HISTORY_FAILED_LOG}</maxHistory> 
 	      <timeBasedFileNamingAndTriggeringPolicy
 	            class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">

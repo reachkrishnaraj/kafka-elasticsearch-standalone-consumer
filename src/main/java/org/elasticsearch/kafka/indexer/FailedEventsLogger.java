@@ -1,4 +1,4 @@
-package org.elasticsearch.kafka.consumer;
+package org.elasticsearch.kafka.indexer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
