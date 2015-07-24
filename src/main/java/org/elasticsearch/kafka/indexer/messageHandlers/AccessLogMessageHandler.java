@@ -1,4 +1,4 @@
-package org.elasticsearch.kafka.consumer.messageHandlers;
+package org.elasticsearch.kafka.indexer.messageHandlers;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -6,9 +6,9 @@ import java.util.TimeZone;
 
 import org.codehaus.jackson.map.ObjectMapper;
 import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.kafka.consumer.ConsumerConfig;
-import org.elasticsearch.kafka.consumer.MessageHandler;
-import org.elasticsearch.kafka.consumer.mappers.AccessLogMapper;
+import org.elasticsearch.kafka.indexer.ConsumerConfig;
+import org.elasticsearch.kafka.indexer.MessageHandler;
+import org.elasticsearch.kafka.indexer.mappers.AccessLogMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +52,7 @@ public class AccessLogMessageHandler extends MessageHandler {
 		accessLogMsgObj.getKafkaMetaData().setOffset(offset);
 		accessLogMsgObj.getKafkaMetaData().setTopic(this.getConfig().topic);
 		accessLogMsgObj.getKafkaMetaData().setConsumerGroupName(this.getConfig().consumerGroupName);
-		accessLogMsgObj.getKafkaMetaData().setPartition(this.getConfig().partition);		
+		accessLogMsgObj.getKafkaMetaData().setPartition(this.getConfig().firstPartition);		
 		accessLogMsgObj.setIp(splittedMsg[0].trim());
 		accessLogMsgObj.setProtocol(splittedMsg[1].trim());
 				

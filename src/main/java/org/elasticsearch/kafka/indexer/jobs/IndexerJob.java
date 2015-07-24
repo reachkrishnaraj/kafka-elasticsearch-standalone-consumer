@@ -1,4 +1,6 @@
-package org.elasticsearch.kafka.consumer;
+package org.elasticsearch.kafka.indexer.jobs;
+
+import java.util.concurrent.Callable;
 
 import kafka.common.ErrorMapping;
 import kafka.javaapi.FetchResponse;
@@ -9,72 +11,55 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.kafka.indexer.ConsumerConfig;
+import org.elasticsearch.kafka.indexer.KafkaClient;
+import org.elasticsearch.kafka.indexer.MessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ConsumerJob {
+public class IndexerJob implements Callable<IndexerJobStatus> {
 
-	private static final Logger logger = LoggerFactory.getLogger(ConsumerJob.class);
+	private static final Logger logger = LoggerFactory.getLogger(IndexerJob.class);
 	private ConsumerConfig consumerConfig;
-	private long offsetForThisRound;
 	private MessageHandler msgHandler;
 	private TransportClient esClient;
 	public KafkaClient kafkaConsumerClient;
-	private Long nextOffsetToProcess;
+	private long offsetForThisRound;
+	private long nextOffsetToProcess;
 	private boolean isStartingFirstTime;
 	private ByteBufferMessageSet byteBufferMsgSet = null;
 	private FetchResponse fetchResponse = null;
+	private final String currentTopic;
+	private final int currentPartition;
 
 	private int kafkaReinitSleepTimeMs = 6000;
-	private int esReinitSleepTimeMs = 6000;
+    private IndexerJobStatus indexerJobStatus;
+    private volatile boolean shutdownRequested = false;
+    private boolean isDryRun = false;
 
-	public ConsumerJob(ConsumerConfig config) throws Exception {
+	public IndexerJob(ConsumerConfig config, int partition, TransportClient esClient) throws Exception {
 		this.consumerConfig = config;
-		this.isStartingFirstTime = true;
-		this.initKafka();
-		this.initElasticSearch();
-		this.createMessageHandler();
-	}
-
-	void initElasticSearch() throws Exception {
-		String[] esHostPortList = consumerConfig.esHostPortList.trim().split(",");
-		logger.info("ElasticSearch HostPortList is: {} ", consumerConfig.esHostPortList);
-		logger.info("Initializing ElasticSearch ...");
-		logger.info("esClusterName={}", consumerConfig.esClusterName);
-
-		// TODO add validation of host:port syntax - to avoid Runtime exceptions
-		try {
-			Settings settings = ImmutableSettings.settingsBuilder()
-					.put("cluster.name", consumerConfig.esClusterName)
-					.build();
-			esClient = new TransportClient(settings);
-			for (String eachHostPort : esHostPortList) {
-				logger.info("adding [{}] to TransportClient ... ", eachHostPort);
-				esClient.addTransportAddress(
-					new InetSocketTransportAddress(
-						eachHostPort.split(":")[0].trim(), 
-						Integer.parseInt(eachHostPort.split(":")[1].trim())
-						)
-					);
-			}
-			logger.info("ElasticSearch Client created and intialized OK");
-		} catch (Exception e) {
-			logger.error("Exception when trying to connect and create ElasticSearch Client. Throwing the error. Error Message is::"
-					+ e.getMessage());
-			throw e;
-		}
+		this.currentPartition = partition;
+		this.currentTopic = config.topic;
+		this.esClient = esClient;
+		indexerJobStatus = new IndexerJobStatus(-1L, IndexerJobStatusEnum.Created, partition);
+		isStartingFirstTime = true;
+		isDryRun = Boolean.parseBoolean(config.isDryRun);
+		initKafka();
+		createMessageHandler();
+		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Initialized);
 	}
 
 	void initKafka() throws Exception {
 		logger.info("Initializing Kafka ...");
 		String consumerGroupName = consumerConfig.consumerGroupName;
 		if (consumerGroupName.isEmpty()) {
-			consumerGroupName = "Client_" + consumerConfig.topic + "_"
-					+ consumerConfig.partition;
+			consumerGroupName = "es_indexer_" + currentTopic + "_" + currentPartition;
 			logger.info("ConsumerGroupName was empty, set it to {}", consumerGroupName);
 		}
-		logger.info("consumerGroupName={}", consumerGroupName);
-		kafkaConsumerClient = new KafkaClient(consumerConfig, consumerGroupName);
+		String kafkaClientId = consumerGroupName  + "_" + currentPartition;
+		logger.info("kafkaClientId={}", kafkaClientId);
+		kafkaConsumerClient = new KafkaClient(consumerConfig, kafkaClientId, currentPartition);
 		logger.info("Kafka client created and intialized OK");
 	}
 
@@ -90,16 +75,25 @@ public class ConsumerJob {
 		Thread.sleep(kafkaReinitSleepTimeMs);
 	}
 
-	void reInitElasticSearch() throws Exception {
-		logger.info("Re-Initializing ElasticSearch");
-		logger.info("Closing ElasticSearch");
-		esClient.close();
-		logger.info("Completed closing ElasticSearch and starting to initialize again");
-		initElasticSearch();
-		logger.info("ReInitialized ElasticSearch. Will sleep for {} ms ...", esReinitSleepTimeMs);
-		Thread.sleep(esReinitSleepTimeMs);
+	private void createMessageHandler() throws Exception {
+		try {
+			logger.info("MessageHandler Class given in config is {}", consumerConfig.messageHandlerClass);
+			msgHandler = (MessageHandler) Class
+					.forName(consumerConfig.messageHandlerClass)
+					.getConstructor(TransportClient.class, ConsumerConfig.class)
+					.newInstance(esClient, consumerConfig);
+			logger.debug("Created and initialized MessageHandler: {}", consumerConfig.messageHandlerClass);
+		} catch (Exception e) {
+			logger.error("Exception creating MessageHandler class: " + e.getMessage(), e);
+			throw e;
+		}
 	}
 
+	// a hook to be used by the Manager app to request a graceful shutdown of the job
+	public void requestShutdown() {
+		shutdownRequested = true;
+	}
+	
 	public void checkKafkaOffsets() {
 		try {
 			long currentOffset = kafkaConsumerClient.fetchCurrentOffsetFromKafka();
@@ -122,8 +116,8 @@ public class ConsumerJob {
 				offsetForThisRound = consumerConfig.startOffset;
 			} else {
 				throw new Exception(
-					"Custom start offset for topic [" + consumerConfig.topic + "], partition [" + 
-					consumerConfig.partition + "] is < 0, which is not an acceptable value - please provide a valid offset; exiting");
+					"Custom start offset for topic [" + currentTopic + "], partition [" + 
+					currentPartition + "] is < 0, which is not an acceptable value - please provide a valid offset; exiting");
 			}
 		} else if (consumerConfig.startOffsetFrom.equalsIgnoreCase("EARLIEST")) {
 			this.offsetForThisRound = kafkaConsumerClient.getEarliestOffset();
@@ -131,7 +125,7 @@ public class ConsumerJob {
 			offsetForThisRound = kafkaConsumerClient.getLastestOffset();
 		} else if (consumerConfig.startOffsetFrom.equalsIgnoreCase("RESTART")) {
 			logger.info("Restarting from where the Offset is left for topic [" + 
-				consumerConfig.topic + "], partition [" + consumerConfig.partition + "]");
+				consumerConfig.topic + "], partition [" + currentPartition + "]");
 			offsetForThisRound = kafkaConsumerClient.fetchCurrentOffsetFromKafka();
 			if (offsetForThisRound == -1)
 			{
@@ -175,21 +169,42 @@ public class ConsumerJob {
 		logger.info("Resulting offsetForThisRound = {}", offsetForThisRound);
 	}
 
-	private void createMessageHandler() throws Exception {
-		try {
-			logger.info("MessageHandler Class given in config is {}", consumerConfig.messageHandlerClass);
-			msgHandler = (MessageHandler) Class
-					.forName(consumerConfig.messageHandlerClass)
-					.getConstructor(TransportClient.class, ConsumerConfig.class)
-					.newInstance(esClient, consumerConfig);
-			logger.debug("Created and initialized MessageHandler: {}", consumerConfig.messageHandlerClass);
-		} catch (Exception e) {
-			logger.error("Exception creating MessageHandler class: " + e.getMessage(), e);
-			throw e;
-		}
+	public IndexerJobStatus call() {
+		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Started);
+        while(!shutdownRequested){
+        	try{
+        		// check if there was a request to stop this thread - stop processing if so
+                if (Thread.currentThread().isInterrupted()){
+                    // preserve interruption state of the thread
+                    Thread.currentThread().interrupt();
+                    throw new InterruptedException(
+                    	"Cought interrupted event in IndexerJob for partition=" + currentPartition + " - stopping");
+                }
+        		logger.info("******* Starting a new batch of events from Kafka for partition {} ...", currentPartition);
+        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.InProgress);
+        		processBatch();
+        		// sleep for configured time
+        		// TODO improve sleep pattern
+        		Thread.sleep(consumerConfig.consumerSleepBetweenFetchsMs * 1000);
+        		logger.debug("Completed a round of indexing into ES");
+        	} catch (InterruptedException e) {
+        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Stopped);
+        		stopKafkaClient();
+        	} catch(Exception e){
+        		logger.error("Exception when starting a new round of kafka Indexer job, exiting: " + 
+        				e.getMessage(), e);
+        		// do not keep going if a severe error happened - stop and fix the issue manually,
+        		// then restart the consumer again; It is better to monitor the job externally 
+        		// via Zabbix or the likes - rather then keep failing [potentially] forever
+        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Failed);
+        		stopKafkaClient();
+        	}       
+        }
+		logger.warn("******* Indexing job was stopped, indexerJobStatus={} - exiting", indexerJobStatus);
+		return indexerJobStatus;
 	}
-
-	public void doRun() throws Exception {
+	
+	public void processBatch() throws Exception {
 		checkKafkaOffsets();
 		long jobStartTime = 0l;
 		if (consumerConfig.isPerfReportingEnabled)
@@ -216,7 +231,8 @@ public class ConsumerJob {
 			isStartingFirstTime = false;
 			nextOffsetToProcess = offsetForThisRound;
 		}
-
+		indexerJobStatus.setLastCommittedOffset(offsetForThisRound);
+		
 		fetchResponse = kafkaConsumerClient.getMessagesFromKafka(offsetForThisRound);
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAfterKafaFetch = System.currentTimeMillis();
@@ -225,6 +241,7 @@ public class ConsumerJob {
 		}
 		if (fetchResponse.hasError()) {
 			// Do things according to the error code
+			// TODO figure out what job status we should use - PartialFailure?? and when to clean it up?
 			handleError();
 			return;
 		}
@@ -232,13 +249,12 @@ public class ConsumerJob {
 		// TODO harden the byteBufferMessageSEt life-cycle - make local var
 		byteBufferMsgSet = kafkaConsumerClient.fetchMessageSet(fetchResponse);
 		if (consumerConfig.isPerfReportingEnabled) {
-			long timeAftKafaFetchMsgSet = System.currentTimeMillis();
+			long timeAfterKafkaFetch = System.currentTimeMillis();
 			logger.debug("Completed MsgSet fetch from Kafka. Approx time taken is {} ms ",
-				(timeAftKafaFetchMsgSet - jobStartTime) );
+				(timeAfterKafkaFetch - jobStartTime) );
 		}
 		if (byteBufferMsgSet.validBytes() <= 0) {
 			logger.warn("No events were read from Kafka - finishing this round of reads from Kafka");
-			//Thread.sleep(1000);
 			// TODO re-review this logic
 			long latestOffset = kafkaConsumerClient.getLastestOffset();
 			if (latestOffset != offsetForThisRound) {
@@ -247,7 +263,7 @@ public class ConsumerJob {
 				try {
 					kafkaConsumerClient.saveOffsetInKafka(
 						latestOffset, 
-						fetchResponse.errorCode(consumerConfig.topic, consumerConfig.partition));
+						fetchResponse.errorCode(consumerConfig.topic, currentPartition));
 				} catch (Exception e) {
 					// throw an exception as this will break reading messages in the next round
 					logger.error("Failed to commit the offset in Kafka - exiting: " + e.getMessage(), e);
@@ -264,18 +280,20 @@ public class ConsumerJob {
 			logger.debug("Completed preparing for post to ElasticSearch. Approx time taken: {}ms",
 					(timeAtPrepareES - jobStartTime) );
 		}
-		if (Boolean.parseBoolean(this.consumerConfig.isDryRun.trim())) {
-			logger.info("**** This is a dry run, hence NOT committing the offset in Kafka ****");
+		if (isDryRun) {
+			logger.info("**** This is a dry run, NOT committing the offset in Kafka nor posting to ES ****");
 			return;
 		}
 		try {
 			logger.info("posting the messages to ElasticSearch ...");
 			msgHandler.postToElasticSearch();
 		} catch (ElasticsearchException e) {
-			logger.error("Error posting messages to ElasticSearch, re-initializing: ", e);
-			this.reInitElasticSearch();
-			logger.info("Tried reinitializing ElasticSearch, returning back");
-			return;
+			// TODO decide how to handle / fail in this case
+			// for now - just continue and commit the offset, 
+			// but be aware that ALL messages from this batch are NOT indexed into ES
+			logger.error("Error posting messages to ElasticSearch, skipping them: ", e);
+			// do not re-init ES - as we do not know if this would help or not
+			//this.reInitElasticSearch();
 		}
 
 		if (consumerConfig.isPerfReportingEnabled) {
@@ -287,26 +305,22 @@ public class ConsumerJob {
 		// TODO optimize getting of the fetchResponse.errorCode - in some cases there is no error, 
 		// so no need to call the API every time
 		try {
-			this.kafkaConsumerClient.saveOffsetInKafka(
+			kafkaConsumerClient.saveOffsetInKafka(
 				nextOffsetToProcess, fetchResponse.errorCode(
-					consumerConfig.topic,
-					consumerConfig.partition));
+					consumerConfig.topic, currentPartition));
 		} catch (Exception e) {
 			logger.error("Failed to commit the Offset in Kafka after processing and posting to ES: ", e);
 			logger.info("Trying to reInitialize Kafka and commit the offset again...");
-			this.reInitKafka();
+			reInitKafka();
 			try {
 				logger.info("Attempting to commit the offset after reInitializing Kafka now..");
-				this.kafkaConsumerClient.saveOffsetInKafka(
-					this.nextOffsetToProcess, fetchResponse.errorCode(
-						this.consumerConfig.topic,
-						this.consumerConfig.partition));
+				kafkaConsumerClient.saveOffsetInKafka(
+					nextOffsetToProcess, fetchResponse.errorCode(
+						consumerConfig.topic,
+						currentPartition));
 			} catch (Exception e2) {
-				// KrishnaRaj - Need to handle this situation where
-				// committing offset back to Kafka is failing even after
-				// reInitializing kafka.
 				logger.error("Failed to commit the Offset in Kafka even after reInitializing Kafka - exiting: " +
-				 e2.getMessage(), e2);
+						e2.getMessage(), e2);
 				// there is no point in continuing  - as we will keep re-processing events
 				// from the old offset. Throw an exception and exit;
 				// manually fix KAfka/Zookeeper env and re-start from a 
@@ -329,7 +343,7 @@ public class ConsumerJob {
 	public void handleError() throws Exception {
 		// Do things according to the error code
 		short errorCode = fetchResponse.errorCode(
-				consumerConfig.topic, consumerConfig.partition);
+				consumerConfig.topic, currentPartition);
 		logger.error("Error fetching events from Kafka - handling it. Error code: "
 				+ errorCode);
 		if (errorCode == ErrorMapping.BrokerNotAvailableCode()) {
@@ -401,11 +415,11 @@ public class ConsumerJob {
 		}
 
 	}
-	public void stop() {
-		logger.info("About to close the Kafka & ElasticSearch Client");
-		this.kafkaConsumerClient.close();
-		this.esClient.close();
-		logger.info("Closed Kafka & ElasticSearch Client");
+	public void stopKafkaClient() {
+		logger.info("About to stop Kafka client ");
+		if (kafkaConsumerClient != null)
+			kafkaConsumerClient.close();
+		logger.info("Stopped Kafka client");
 	}
 
 }

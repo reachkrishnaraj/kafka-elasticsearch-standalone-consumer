@@ -1,10 +1,24 @@
 <configuration>
 
+	<!-- PLEASE set to values appropriate for YOUR environment -->
+	<!-- example properties for your reference -->
+  	<property name="ENVIRONMENT" value="development"/>
 	<property name="LOG_DIR" value="/tmp"/>
 	<property name="MAX_HISTORY_MAIN_LOG" value="10"/>
 	<property name="MAX_SIZE_MAIN_LOG" value="10KB"/>
 	<property name="MAX_HISTORY_FAILED_LOG" value="5"/>
 	<property name="MAX_SIZE_FAILED_LOG" value="10MB"/>
+	<!-- end of example properties -->
+	
+	<!-- please substitute tokens with the values suitable for your env -->
+	<property name="ENVIRONMENT" value="<%= @logback_environment %>"/>
+	<property name="LOG_DIR" value="<%= @logback_logdir %>"/>
+	<property name="MAX_HISTORY_MAIN_LOG" value="<%= @logback_maxhistorymainlog %>"/>
+	<property name="MAX_SIZE_MAIN_LOG" value="<%= @logback_maxsize %>"/>
+	<property name="MAX_HISTORY_FAILED_LOG" value="<%= @logback_maxhistoryfailed %>"/>
+	<property name="MAX_SIZE_FAILED_LOG" value="<%= @logback_maxsizefailed %>"/>
+	<!-- end of properties that need adjustment -->
+	
 
 	<appender name="STDOUT"
 		class="ch.qos.logback.core.ConsoleAppender">
@@ -14,11 +28,11 @@
 	</appender>
 
     <appender name="MAIN_LOGS" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_DIR}/kafka_es_consumer.log</file>
+        <file>${LOG_DIR}/kafka_es_indexer.log</file>
         <append>true</append>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- rollover daily -->
-            <fileNamePattern>${LOG_DIR}/kafka_es_consumer-%d{yyyyMMddHH}.%i.log.gz</fileNamePattern>
+            <fileNamePattern>${LOG_DIR}/kafka_es_indexer-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <!-- keep ${MAX_HISTORY_MAIN_LOG} days' worth of history -->
             <maxHistory>${MAX_HISTORY_MAIN_LOG}</maxHistory>
             <!-- or whenever the file size reaches ${MAX_SIZE_MAIN_LOG} -->
@@ -36,7 +50,7 @@
         <append>true</append>
 	    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
 	      <!-- rollover daily -->
-	      <fileNamePattern>failed_es_events-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+	      <fileNamePattern>${LOG_DIR}/failed_es_events-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
 	      <maxHistory>${MAX_HISTORY_FAILED_LOG}</maxHistory> 
 	      <timeBasedFileNamingAndTriggeringPolicy
 	            class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
@@ -49,9 +63,16 @@
         </encoder>
 	</appender>
 
-    <root level="info" additivity="false">
-        <appender-ref ref="STDOUT"/>
-        <appender-ref ref="MAIN_LOGS"/>
-    </root>
+    <logger name="org.elasticsearch.kafka.consumer.FailedEventsLogger" level="error">
+        <appender-ref ref="FAILED_EVENTS" />
+    </logger>
+   <logger name="org.elasticsearch.kafka" level="info">
+     <appender-ref ref="MAIN_LOGS" />
+ 	 <if condition='property("ENVIRONMENT").contains("development")'>
+    	<then>
+    		<appender-ref ref="STDOUT" />
+		</then>
+  	 </if>
+   </logger>
 
 </configuration>

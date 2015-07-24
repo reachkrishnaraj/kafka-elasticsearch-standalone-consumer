@@ -20,18 +20,26 @@ zkCuratorRetryDelayMs=2000
 # default: localhost:9092
 kafkaBrokersList=localhost:9092
 
-# Kafka Consumer group name
-# default: ESKafkaConsumerClient
-consumerGroupName=ESKafkaConsumerClient
+# Kafka Consumer group name prefix - 
+# each indexer job will have a clientId = consumerGroupName + "_" + partitionNumber
+# default: kafka_es_indexer
+consumerGroupName=kafka_es_indexer
 
 # Kafka Topic from which the message has to be processed
 # mandatory property, no default value specified.
 topic=my_log_topic
 
-# Partition in the Kafka's Topic(defined by 'topic' property) from which the message has to be processed.
-# One instance of this consumer read and process from only 1 partition(of the topic)
+## below two properties define a range of partitions to be processed by this application;
+## each partition will be processed by an IndexerJob in a separate Thread, so this also
+## defines the number of indexer threads created by the app - please set memory requirements accordingly
+
+# first partition in the Kafka's Topic(defined by 'topic' property) to process messages from
 # default: 0
-partition=0
+firstPartition=0
+
+# last partition in the Kafka's Topic(defined by 'topic' property) to process messages from
+# no default - is required
+lastPartition=3
 
 # Offset option from where the message fetching should happen in kafka
 # Values can be: CUSTOM / EARLIEST / LATEST / RESTART.
@@ -56,6 +64,9 @@ kafkaSimpleConsumerBufferSizeBytes=31457280
 # Kafka SimpleConsumer socket timeout in MS
 kafkaSimpleConsumerSocketTimeoutMs=10000
 
+# timeout in seconds before force-stopping Indexer app and all indexer jobs
+appStopTimeoutSeconds=10
+
 
 ### ElasticSearch properties ####################################
 # ElasticSearch Host and Port List for all the nodes
@@ -77,11 +88,11 @@ esIndexType=kafkaESType
 # Fully qualified name of a concrete message handler class
 # Default: "org.elasticsearch.kafka.consumer.RawMessageStringHandler"
 # Custom class should be extended from org.elasticsearch.kafka.consumer.MessageHandler class
-messageHandlerClass=org.elasticsearch.kafka.consumer.messageHandlers.RawMessageStringHandler
+messageHandlerClass=org.elasticsearch.kafka.indexer.messageHandlers.RawMessageStringHandler
 
 # Fully qualified name of a custom IndexHandler implementation class
 # Default: org.elasticsearch.kafka.consumer.BasicIndexHandler
-indexHandlerClass=org.elasticsearch.kafka.consumer.BasicIndexHandler
+indexHandlerClass=org.elasticsearch.kafka.indexer.BasicIndexHandler
 
 
 # Preferred message encoding to process the message before posting it to ElasticSearch.

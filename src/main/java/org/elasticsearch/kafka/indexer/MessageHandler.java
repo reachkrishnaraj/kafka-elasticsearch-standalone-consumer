@@ -1,4 +1,4 @@
-package org.elasticsearch.kafka.consumer;
+package org.elasticsearch.kafka.indexer;
 
 import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
@@ -83,21 +83,22 @@ public abstract class MessageHandler {
 					bulkResponse.buildFailureMessage());
 			int failedCount = 0;
 			Iterator<BulkItemResponse> bulkRespItr = bulkResponse.iterator();
+			//TODO research if there is a way to get all failed messages without iterating over
+			// ALL messages in this bulk post request
 			while (bulkRespItr.hasNext()){
 				bulkItemResp = bulkRespItr.next();
 				if (bulkItemResp.isFailed()) {
 					failedCount++;
-					//Need to handle failure messages logging in a better way
-					logger.error("Failed Message #{}: {}", failedCount, bulkItemResp.getFailure().getMessage());
-				} else {
-							//Do stats handling here
-				}
-					
+					String errorMessage = bulkItemResp.getFailure().getMessage();
+					String restResponse = bulkItemResp.getFailure().getStatus().name();
+					logger.error("Failed Message #{}, REST response:{}; errorMessage:{}", 
+							failedCount, restResponse, errorMessage);
+					// TODO: there does not seem to be a way to get the actual failed event
+					// until it is possible - do not log anything into the failed events log file
+					//FailedEventsLogger.logFailedToPostToESEvent(restResponse, errorMessage);
+				} 					
 			}								
 			logger.info("# of failed to post messages to ElasticSearch: {} ", failedCount);
-			// TODO log failed messages somewhere
-			// it does not matter what is returned - as it is ignored now, to avoid 
-			// re-processing the same failed messages over and over
 			return false;				
 		}
 		logger.info("Bulk Post to ElasticSearch finished OK");
@@ -124,12 +125,11 @@ public abstract class MessageHandler {
 			try {
 				transformedMessage = this.transformMessage(bytesMessage, messageAndOffset.offset());
 			} catch (Exception e) {
-				// TODO decide whether you want to fail the whole batch if transformation 
-				// of one message fails, or if you just want to log this message into failedEvents.log
-				// for later re-processing
-				// for now - just log and continue
+				String msgStr = new String(bytesMessage);
 				logger.error("ERROR transforming message at offset={} - skipping it: {}", 
-						messageAndOffset.offset(), new String(bytesMessage), e);
+						messageAndOffset.offset(), msgStr, e);
+				FailedEventsLogger.logFailedToTransformEvent(
+						messageAndOffset.offset(), e.getMessage(), msgStr);
 				continue;
 			}
 			this.getBuildReqBuilder().add(

@@ -1,4 +1,4 @@
-package org.elasticsearch.kafka.consumer.mappers;
+package org.elasticsearch.kafka.indexer.mappers;
 
 public class AccessLogMapper {
 
