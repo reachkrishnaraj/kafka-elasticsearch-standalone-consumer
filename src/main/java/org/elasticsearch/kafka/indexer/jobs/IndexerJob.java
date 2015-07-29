@@ -37,14 +37,14 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
     private volatile boolean shutdownRequested = false;
     private boolean isDryRun = false;
 
-	public IndexerJob(ConsumerConfig config, int partition, TransportClient esClient) throws Exception {
+	public IndexerJob(ConsumerConfig config, int partition) throws Exception {
 		this.consumerConfig = config;
 		this.currentPartition = partition;
 		this.currentTopic = config.topic;
-		this.esClient = esClient;
 		indexerJobStatus = new IndexerJobStatus(-1L, IndexerJobStatusEnum.Created, partition);
 		isStartingFirstTime = true;
 		isDryRun = Boolean.parseBoolean(config.isDryRun);
+		initElasticSearch();
 		initKafka();
 		createMessageHandler();
 		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Initialized);
@@ -61,6 +61,34 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		logger.info("kafkaClientId={}", kafkaClientId);
 		kafkaConsumerClient = new KafkaClient(consumerConfig, kafkaClientId, currentPartition);
 		logger.info("Kafka client created and intialized OK");
+	}
+
+	private void initElasticSearch() throws Exception {
+		String[] esHostPortList = consumerConfig.esHostPortList.trim().split(",");
+		logger.info("Initializing ElasticSearch... hostPortList={}, esClusterName={}",
+			consumerConfig.esHostPortList, consumerConfig.esClusterName);
+
+		// TODO add validation of host:port syntax - to avoid Runtime exceptions
+		try {
+			Settings settings = ImmutableSettings.settingsBuilder()
+				.put("cluster.name", consumerConfig.esClusterName)
+				.build();
+			esClient = new TransportClient(settings);
+			for (String eachHostPort : esHostPortList) {
+				logger.info("adding [{}] to TransportClient ... ", eachHostPort);
+				esClient.addTransportAddress(
+					new InetSocketTransportAddress(
+						eachHostPort.split(":")[0].trim(), 
+						Integer.parseInt(eachHostPort.split(":")[1].trim())
+					)
+				);
+			}
+			logger.info("ElasticSearch Client created and intialized OK");
+		} catch (Exception e) {
+			logger.error("Exception when trying to connect and create ElasticSearch Client. Throwing the error. Error Message is::"
+					+ e.getMessage());
+			throw e;
+		}
 	}
 
 	void reInitKafka() throws Exception {

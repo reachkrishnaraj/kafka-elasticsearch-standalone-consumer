@@ -43,7 +43,7 @@ public class IndexerJobManager {
 	}
 
 	public void startAll() throws Exception {
-		initElasticSearch();
+		//initElasticSearch();
         executorService = Executors.newFixedThreadPool(numOfPartitions);
         indexerJobs = new ConcurrentHashMap<>();
 		// create as many IndexerJobs as there are partitions in the events topic
@@ -51,7 +51,7 @@ public class IndexerJobManager {
         try {
 	        for (int partition=firstPartition; partition<=lastPartition; partition++){
 	        	logger.info("Creating IndexerJob for partition={}", partition);
-	        	IndexerJob pIndexerJob = new IndexerJob(consumerConfig, partition, esClient);
+	        	IndexerJob pIndexerJob = new IndexerJob(consumerConfig, partition);
 	        	indexerJobs.put(partition, pIndexerJob);
 	        }
         } catch (Exception e) {
