@@ -7,10 +7,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.common.settings.ImmutableSettings;
-import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.kafka.indexer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,7 +15,6 @@ public class IndexerJobManager {
 
 	private static final Logger logger = LoggerFactory.getLogger(IndexerJobManager.class);
 	private ConsumerConfig consumerConfig;
-	private TransportClient esClient;
     private ExecutorService executorService;
     private int numOfPartitions;
     private int firstPartition;
@@ -43,7 +38,7 @@ public class IndexerJobManager {
 	}
 
 	public void startAll() throws Exception {
-		initElasticSearch();
+		//initElasticSearch();
         executorService = Executors.newFixedThreadPool(numOfPartitions);
         indexerJobs = new ConcurrentHashMap<>();
 		// create as many IndexerJobs as there are partitions in the events topic
@@ -51,7 +46,7 @@ public class IndexerJobManager {
         try {
 	        for (int partition=firstPartition; partition<=lastPartition; partition++){
 	        	logger.info("Creating IndexerJob for partition={}", partition);
-	        	IndexerJob pIndexerJob = new IndexerJob(consumerConfig, partition, esClient);
+	        	IndexerJob pIndexerJob = new IndexerJob(consumerConfig, partition);
 	        	indexerJobs.put(partition, pIndexerJob);
 	        }
         } catch (Exception e) {
@@ -63,42 +58,12 @@ public class IndexerJobManager {
         indexerJobFutures = executorService.invokeAll(indexerJobs.values());       
 	}
 	
-	private void initElasticSearch() throws Exception {
-		String[] esHostPortList = consumerConfig.esHostPortList.trim().split(",");
-		logger.info("Initializing ElasticSearch... hostPortList={}, esClusterName={}",
-			consumerConfig.esHostPortList, consumerConfig.esClusterName);
-
-		// TODO add validation of host:port syntax - to avoid Runtime exceptions
-		try {
-			Settings settings = ImmutableSettings.settingsBuilder()
-				.put("cluster.name", consumerConfig.esClusterName)
-				.build();
-			esClient = new TransportClient(settings);
-			for (String eachHostPort : esHostPortList) {
-				logger.info("adding [{}] to TransportClient ... ", eachHostPort);
-				esClient.addTransportAddress(
-					new InetSocketTransportAddress(
-						eachHostPort.split(":")[0].trim(), 
-						Integer.parseInt(eachHostPort.split(":")[1].trim())
-					)
-				);
-			}
-			logger.info("ElasticSearch Client created and intialized OK");
-		} catch (Exception e) {
-			logger.error("Exception when trying to connect and create ElasticSearch Client. Throwing the error. Error Message is::"
-					+ e.getMessage());
-			throw e;
-		}
-	}
-
 	public void getJobStatuses(){
 		// TODO check all jobs and return a list of IndexerJobStatus'es
 	}
 	
 	public void stop() {
-		logger.info("About to stop ElasticSearch Client and all consumer jobs ...");
-		if (esClient != null)
-			esClient.close();
+		logger.info("About to stop all consumer jobs ...");
 		if (executorService != null && !executorService.isTerminated()) {
 			try {
 				executorService.awaitTermination(consumerConfig.appStopTimeoutSeconds, TimeUnit.SECONDS);

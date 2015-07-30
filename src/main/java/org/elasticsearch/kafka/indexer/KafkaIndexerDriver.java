@@ -1,7 +1,13 @@
 package org.elasticsearch.kafka.indexer;
 
+import java.lang.management.ManagementFactory;
 import java.time.LocalDateTime;
 
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+
+import org.elasticsearch.kafka.indexer.jmx.KafkaEsIndexerStatus;
+import org.elasticsearch.kafka.indexer.jmx.KafkaEsIndexerStatusMBean;
 import org.elasticsearch.kafka.indexer.jobs.IndexerJobManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +30,13 @@ public class KafkaIndexerDriver {
 		}		
 		kafkaConsumerConfig = new ConsumerConfig(args[0]);
 		logger.info("Created kafka consumer config OK");
-		indexerJobManager = new IndexerJobManager(kafkaConsumerConfig);		
+		indexerJobManager = new IndexerJobManager(kafkaConsumerConfig);	
+		
+		logger.info("Registering KafkfaEsIndexerStatus MBean: ");
+		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer(); 
+        ObjectName name = new ObjectName("org.elasticsearch.kafka.indexer:type=KafkfaEsIndexerStatus"); 
+        KafkaEsIndexerStatusMBean hc = new KafkaEsIndexerStatus();
+        mbs.registerMBean(hc, name); 
     }
 	
 
