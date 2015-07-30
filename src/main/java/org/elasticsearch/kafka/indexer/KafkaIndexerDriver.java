@@ -7,7 +7,7 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
 import org.elasticsearch.kafka.indexer.jmx.KafkaEsIndexerStatus;
-import org.elasticsearch.kafka.indexer.jmx.KafkfaEsIndexerStatusMBean;
+import org.elasticsearch.kafka.indexer.jmx.KafkaEsIndexerStatusMBean;
 import org.elasticsearch.kafka.indexer.jobs.IndexerJobManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +35,7 @@ public class KafkaIndexerDriver {
 		logger.info("Registering KafkfaEsIndexerStatus MBean: ");
 		MBeanServer mbs = ManagementFactory.getPlatformMBeanServer(); 
         ObjectName name = new ObjectName("org.elasticsearch.kafka.indexer:type=KafkfaEsIndexerStatus"); 
-        KafkfaEsIndexerStatusMBean hc = new KafkaEsIndexerStatus();
+        KafkaEsIndexerStatusMBean hc = new KafkaEsIndexerStatus();
         mbs.registerMBean(hc, name); 
     }
 	

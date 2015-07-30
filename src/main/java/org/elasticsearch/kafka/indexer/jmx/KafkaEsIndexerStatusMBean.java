@@ -1,5 +1,5 @@
 package org.elasticsearch.kafka.indexer.jmx;
 
-public interface KafkfaEsIndexerStatusMBean {
+public interface KafkaEsIndexerStatusMBean {
 	boolean isAlive();
 }

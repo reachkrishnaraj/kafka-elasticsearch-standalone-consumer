@@ -1,10 +1,8 @@
 package org.elasticsearch.kafka.indexer.jmx;
 
-public class KafkaEsIndexerStatus implements KafkfaEsIndexerStatusMBean{
-
+public class KafkaEsIndexerStatus implements KafkaEsIndexerStatusMBean{
 	
-	public boolean isAlive() {
-		
+	public boolean isAlive() {		
 		return true;
 	}
 

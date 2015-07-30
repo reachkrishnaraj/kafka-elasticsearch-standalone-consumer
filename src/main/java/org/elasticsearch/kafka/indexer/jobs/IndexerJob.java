@@ -217,7 +217,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
         		logger.debug("Completed a round of indexing into ES");
         	} catch (InterruptedException e) {
         		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Stopped);
-        		stopKafkaClient();
+        		stopClients();
         	} catch(Exception e){
         		logger.error("Exception when starting a new round of kafka Indexer job, exiting: " + 
         				e.getMessage(), e);
@@ -225,7 +225,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
         		// then restart the consumer again; It is better to monitor the job externally 
         		// via Zabbix or the likes - rather then keep failing [potentially] forever
         		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Failed);
-        		stopKafkaClient();
+        		stopClients();
         	}       
         }
 		logger.warn("******* Indexing job was stopped, indexerJobStatus={} - exiting", indexerJobStatus);
@@ -443,7 +443,10 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		}
 
 	}
-	public void stopKafkaClient() {
+	public void stopClients() {
+		logger.info("About to stop ES client ");
+		if (esClient != null)
+			esClient.close();
 		logger.info("About to stop Kafka client ");
 		if (kafkaConsumerClient != null)
 			kafkaConsumerClient.close();
