@@ -145,4 +145,8 @@ public class ConsumerConfig {
 		return isPerfReportingEnabled;
 	}
 
+	public Properties getProperties() {
+		return prop;
+	}
+
 }
