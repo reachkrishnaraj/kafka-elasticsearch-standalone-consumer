@@ -2,7 +2,9 @@
 .project
 .settings/
 /logs/
+.idea
+.classpath
 
-
+*.iml
 kafkaESConsumerLocal.properties
 dependency-reduced-pom.xml
