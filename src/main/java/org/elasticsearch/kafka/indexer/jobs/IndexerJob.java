@@ -1,21 +1,21 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
-import java.util.concurrent.Callable;
-
 import kafka.common.ErrorMapping;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
-
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.kafka.indexer.ConsumerConfig;
+import org.elasticsearch.kafka.indexer.FailedEventsLogger;
 import org.elasticsearch.kafka.indexer.KafkaClient;
 import org.elasticsearch.kafka.indexer.MessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Callable;
 
 public class IndexerJob implements Callable<IndexerJobStatus> {
 
@@ -319,7 +319,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			// TODO decide how to handle / fail in this case
 			// for now - just continue and commit the offset, 
 			// but be aware that ALL messages from this batch are NOT indexed into ES
-			logger.error("Error posting messages to ElasticSearch, skipping them: ", e);
+			logger.error("Error posting messages to Elastic Search for offset {}-->{} in partition {} skipping them: ",offsetForThisRound,nextOffsetToProcess-1,currentPartition, e);
+			FailedEventsLogger.logFailedEvent(offsetForThisRound, nextOffsetToProcess - 1, currentPartition, e.getDetailedMessage(), null);
 			// do not re-init ES - as we do not know if this would help or not
 			//this.reInitElasticSearch();
 		}
