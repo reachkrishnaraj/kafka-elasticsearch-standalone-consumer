@@ -20,7 +20,7 @@ public class FailedEventsLogger {
 				offset, errorMsg, event);
 	}
 	public static void logFailedEvent(long startOffset,long endOffset, int partition ,String errorMsg, String event){
-		logger.error("Error transforming event from : OFFSET: {} --> {} PARTITION: {},EVENT: {},ERROR: {} ",
+		logger.error("Error transforming event: OFFSET: {} --> {} PARTITION: {},EVENT: {},ERROR: {} ",
 				startOffset,endOffset, partition,event,errorMsg);
 	}
 
