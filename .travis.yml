@@ -10,4 +10,4 @@ install:
 
 # Run the Build
 script:
-  - TERM=dumb ./gradlew bintrayUpload
+  - TERM=dumb ./gradlew clean bintrayUpload -Pbuild=${TRAVIS_BUILD_NUMBER} -Prelease=0.0.0
