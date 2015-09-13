@@ -11,7 +11,10 @@ version = release + '.' + build
 //version = '${buildId}.${buildNumber}'
 
 description = """kafka-elasticsearch-consumer"""
-
+def artifact_provider_url       = hasProperty('artifact_provider_url') ? artifact_provider_url : System.getenv('artifact_provider_url')
+def artifact_provider_user      = hasProperty('artifact_provider_user') ? artifact_provider_user : System.getenv('artifact_provider_user')
+def artifact_provider_org       = hasProperty('artifact_provider_org') ? artifact_provider_org : System.getenv('artifact_provider_org')
+def artifact_provider_secret    = hasProperty('artifact_provider_secret') ? artifact_provider_secret : System.getenv('artifact_provider_secret')
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
@@ -61,6 +64,35 @@ jar {
         attributes("Implementation-Title": "kafka-elasticsearch-consumer", "Implementation-Version": version)
 		attributes 'Main-class':'org.elasticsearch.kafka.indexer.KafkaIndexerDriver'
     }
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    classifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+artifacts {
+    archives sourcesJar
+}
+
+bintray {
+    user = artifact_provider_user
+    key = artifact_provider_secret
+    pkg {
+        repo = 'bigdatadevs-repo'
+        name = 'elasticsearch-kafka-consumer'
+        userOrg = artifact_provider_org
+        licenses = ['AGPL-V3']
+        vcsUrl = artifact_provider_url
+        version {
+            name = '0.0.2'
+            desc = 'Current version'
+            released  = new Date()
+            vcsTag = '0.0.2'
+            attributes = ['gradle-plugin': 'com.use.less:com.use.less.gradle:gradle-useless-plugin']
+        }
+    }
+    configurations = ['archives']
 }
 
 
