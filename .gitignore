@@ -1,9 +1,12 @@
-/bin/
+bin/
+build/
 .project
 .settings/
 /logs/
 .idea
 .classpath
+.gradle/
+.settings/
 
 *.iml
 kafkaESConsumerLocal.properties

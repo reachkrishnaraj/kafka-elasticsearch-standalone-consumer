@@ -1,0 +1,8 @@
+sudo: false
+language: java
+jdk: oraclejdk8
+script: mvn verify
+after_success:
+- mvn clean test jacoco:report coveralls:report
+- echo TRAVIS_PULL_REQUEST = "${TRAVIS_PULL_REQUEST}" && echo TRAVIS_JDK_VERSION =
+  “${TRAVIS_JDK_VERSION}” && echo TRAVIS_TAG = "${TRAVIS_TAG}"
