@@ -1,27 +1,25 @@
 # Welcome to the kafka-elasticsearch-standalone-consumer wiki!
 
-## Illustration of kafka-elasticsearch-standalone-consumer usage
-
-### The consumer is positioned in the middle.
+## Architecture of the kafka-elasticsearch-standalone-consumer [indexer]
 
 ![](https://raw.githubusercontent.com/reachkrishnaraj/kafka-elasticsearch-standalone-consumer/master/img/Kafka_ES_Illustration_New.png)
 
 
 # Introduction
 
-### **Kafka Standalone Consumer will read the messages from Kafka, processes and index them in ElasticSearch.**
+### **Kafka Standalone Consumer will read the messages from Kafka, processes and index them into ElasticSearch.**
 
 ### **Easily Scaleable & Extendable !**
 
-### _As described in the illustration above, here is how the StandAlone Consumer works:_
+### _As described in the illustration above, here is how the indexer works:_
 
-* Kafka has a topic named, say `Topic_1`
+* Kafka has a topic named, say `Topic1`
 
-* Lets say, `Topic_1` has 5 partitions.
+* Lets say, `Topic1` has 5 partitions.
 
 * In the configuration file, kafka-es-indexer.properties, set firstPartition=0 and lastPartition=4 properties 
 
-* start the standalone indexer application as described below 
+* start the indexer application as described below 
 
 * there will be 5 threads started, one for each consumer from each of the partitions
 
