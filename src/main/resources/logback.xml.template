@@ -63,7 +63,7 @@
         </encoder>
 	</appender>
 
-    <logger name="org.elasticsearch.kafka.consumer.FailedEventsLogger" level="error">
+    <logger name="org.elasticsearch.kafka.indexer.FailedEventsLogger" level="error">
         <appender-ref ref="FAILED_EVENTS" />
     </logger>
    <logger name="org.elasticsearch.kafka" level="info">

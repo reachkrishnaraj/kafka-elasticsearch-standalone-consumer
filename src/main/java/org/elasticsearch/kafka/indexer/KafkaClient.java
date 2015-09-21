@@ -1,33 +1,24 @@
 package org.elasticsearch.kafka.indexer;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import com.netflix.curator.framework.CuratorFramework;
+import com.netflix.curator.framework.CuratorFrameworkFactory;
+import com.netflix.curator.retry.RetryNTimes;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.OffsetAndMetadata;
 import kafka.common.TopicAndPartition;
-import kafka.javaapi.FetchResponse;
-import kafka.javaapi.OffsetCommitResponse;
-import kafka.javaapi.OffsetFetchRequest;
-import kafka.javaapi.OffsetFetchResponse;
-import kafka.javaapi.OffsetResponse;
-import kafka.javaapi.PartitionMetadata;
-import kafka.javaapi.TopicMetadata;
-import kafka.javaapi.TopicMetadataRequest;
+import kafka.javaapi.*;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import com.netflix.curator.framework.CuratorFramework;
-import com.netflix.curator.framework.CuratorFrameworkFactory;
-import com.netflix.curator.retry.RetryNTimes;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class KafkaClient {
 
@@ -85,7 +76,7 @@ public class KafkaClient {
 					consumerConfig.kafkaSimpleConsumerSocketTimeoutMs, 
 					consumerConfig.kafkaSimpleConsumerBufferSizeBytes, 
 					kafkaClientId);
-			logger.info("Initialized Kafka Consumer successfully");
+			logger.info("Initialized Kafka Consumer successfully for partition {}",partition);
 		}
 		catch(Exception e){
 			logger.error("Failed to initialize Kafka Consumer: " + e.getMessage());
@@ -94,8 +85,8 @@ public class KafkaClient {
 	}
 
 	public short saveOffsetInKafka(long offset, short errorCode) throws Exception{
-		logger.debug("Starting to save the Offset value to Kafka: offset={}, errorCode={}",
-				offset, errorCode);
+		logger.debug("Starting to save the Offset value to Kafka: offset={}, errorCode={} for partition {}",
+				offset, errorCode,partition);
 		short versionID = 0;
 		int correlationId = 0;
 		try{
@@ -107,7 +98,7 @@ public class KafkaClient {
 			kafka.javaapi.OffsetCommitRequest offsetCommitReq = new kafka.javaapi.OffsetCommitRequest(
 					kafkaClientId, mapForCommitOffset, correlationId, kafkaClientId, versionID);
 			OffsetCommitResponse offsetCommitResp = simpleConsumer.commitOffsets(offsetCommitReq);
-			logger.debug("Completed OffsetSet commit. OffsetCommitResponse ErrorCode = {} ", offsetCommitResp.errors().get(tp)+ " Returning to the caller.");
+			logger.debug("Completed OffsetSet commit for partition {}. OffsetCommitResponse ErrorCode = {} Returning to caller ", partition,offsetCommitResp.errors().get(tp));
 			return (Short) offsetCommitResp.errors().get(tp);
 		}
 		catch(Exception e){
@@ -117,7 +108,7 @@ public class KafkaClient {
 	}
 		
 	private PartitionMetadata findLeader() throws Exception {
-		logger.info("Looking for Kafka leader broker ...");
+		logger.info("Looking for Kafka leader broker for partition {}...",partition);
 		PartitionMetadata currentPartitionMetaData = null;
 		SimpleConsumer leadFindConsumer = null;
 		// take the first kafka broker from the list - it should provide all required META info anyway
@@ -182,16 +173,16 @@ public class KafkaClient {
 
 	
 	public PartitionMetadata findNewLeader() throws Exception {
-		logger.info("Starting the findNewLeader() ...");
+		logger.info("Starting the findNewLeader() for partition {}",partition);
 		for (int i = 0; i < 3; i++) {
 			logger.info("Attempt #{}", i);
 			boolean goToSleep = false;
             PartitionMetadata metadata = findLeader();
             if (metadata == null) {
-            	logger.info("MetaData is Empty, going to sleep");
+            	logger.info("MetaData is Empty, going to sleep for partition {}",partition);
             	goToSleep = true;
             } else if (metadata.leader() == null) {
-            	logger.info("MetaData leader is Empty, going to sleep");
+            	logger.info("MetaData leader is Empty, going to sleep for partition {}",partition);
             	goToSleep = true;
             } else if (leaderBrokerHost.equalsIgnoreCase(metadata.leader().host()) && i <= 1) {
                 // first time through if the leader hasn't changed give ZooKeeper a second to recover
@@ -199,7 +190,7 @@ public class KafkaClient {
                 //
                 goToSleep = true;
             } else {
-        		logger.info("Found new leader: leadBrokerURL: {}", leaderBrokerURL);
+				logger.info("Found new leader: leadBrokerURL: {} for partition {}", leaderBrokerURL ,partition);
                 return metadata;
             }
             if (goToSleep) {
@@ -215,19 +206,19 @@ public class KafkaClient {
 	
 	
 	public long getLastestOffset() throws Exception {
-		logger.debug("Getting LastestOffset for topic={}, partition={}, kafkaGroupId={}", 
+		logger.debug("Getting LastestOffset for topic={}, partition={}, kafkaGroupId={}",
 				topic, partition, kafkaClientId);
 		long latestOffset = getOffset(topic, partition, OffsetRequest.LatestTime(), kafkaClientId);
-		logger.debug("LatestOffset={}", latestOffset);
+		logger.debug("LatestOffset={}  for partition {}", latestOffset ,partition);
 		return latestOffset;
 		
 	}
 	
 	public long getEarliestOffset() throws Exception {
-		logger.debug("Getting EarliestOffset for topic={}, partition={}, kafkaGroupId={}", 
+		logger.debug("Getting EarliestOffset for topic={}, partition={}, kafkaGroupId={}",
 				topic, partition, kafkaClientId);
 		long earliestOffset = this.getOffset(topic, partition, OffsetRequest.EarliestTime(), kafkaClientId);
-		logger.debug("earliestOffset={}", earliestOffset);
+		logger.debug("earliestOffset={} for partition {}", earliestOffset,partition);
 		return earliestOffset;
 	}
 	
@@ -244,17 +235,17 @@ public class KafkaClient {
 			OffsetResponse response = simpleConsumer.getOffsetsBefore(request);
 
 			if (response.hasError()) {
-				logger.error("Error fetching offsets from Kafka. Reason: " + response.errorCode(topic, partition));
-				throw new Exception("Error fetching offsets from Kafka. Reason: " + response.errorCode(topic, partition));
+				logger.error("Error fetching offsets from Kafka. Reason: {} for partition {}" , response.errorCode(topic, partition),partition);
+				throw new Exception("Error fetching offsets from Kafka. Reason: " + response.errorCode(topic, partition) +"for partition "+partition);
 			}
 			long[] offsets = response.offsets(topic, partition);
 			return offsets[0];
 
 		}
-	catch(Exception e){
-		logger.error("Exception when trying to get the Offset. Throwing the exception. Error is:" + e.getMessage());
-		throw e;
-	}
+		catch(Exception e){
+			logger.error("Exception when trying to get the Offset. Throwing the exception for partition {}" ,partition,e);
+			throw e;
+		}
 	}
 	
 	public long fetchCurrentOffsetFromKafka() throws Exception{
@@ -275,7 +266,7 @@ public class KafkaClient {
 			return currentOffset;
 		}
 		catch(Exception e){
-			logger.error("Error when fetching current offset from kafka: " + e.getMessage());
+			logger.error("Error when fetching current offset from kafka: for partition {}" ,partition,e);
 			throw e;
 		}
 	}
@@ -292,7 +283,7 @@ public class KafkaClient {
 			return fetchResponse;
 		}
 		catch(Exception e){
-			logger.error("Exception fetching messages from Kafka: " + e.getMessage(), e);
+			logger.error("Exception fetching messages from Kafka for partition {}" ,partition,e);
 			throw e;
 		}
 	}

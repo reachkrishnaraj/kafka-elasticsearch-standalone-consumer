@@ -1,16 +1,14 @@
 package org.elasticsearch.kafka.indexer;
 
-import java.lang.management.ManagementFactory;
-import java.time.LocalDateTime;
-
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-
 import org.elasticsearch.kafka.indexer.jmx.KafkaEsIndexerStatus;
 import org.elasticsearch.kafka.indexer.jmx.KafkaEsIndexerStatusMBean;
 import org.elasticsearch.kafka.indexer.jobs.IndexerJobManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import java.lang.management.ManagementFactory;
 
 public class KafkaIndexerDriver {
 	
@@ -19,6 +17,7 @@ public class KafkaIndexerDriver {
 	private boolean isConsumeJobInProgress = false;
 	private ConsumerConfig kafkaConsumerConfig;
 	private static final Logger logger = LoggerFactory.getLogger(KafkaIndexerDriver.class);
+	private static final String KAFKA_CONSUMER_SHUTDOWN_THREAD = "kafka-indexer-shutdown-thread";
 	
 	public KafkaIndexerDriver(){		
 	}
@@ -79,7 +78,7 @@ public class KafkaIndexerDriver {
     public static void main(String[] args) {
     	KafkaIndexerDriver driver = new KafkaIndexerDriver();
 
-    	Runtime.getRuntime().addShutdownHook(new Thread() {
+    	Runtime.getRuntime().addShutdownHook(new Thread(KAFKA_CONSUMER_SHUTDOWN_THREAD) {
   	      public void run() {
   	        logger.info("Running Shutdown Hook .... ");
   	        try {
