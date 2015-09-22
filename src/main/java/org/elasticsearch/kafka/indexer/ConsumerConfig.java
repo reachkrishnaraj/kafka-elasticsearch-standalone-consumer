@@ -61,6 +61,10 @@ public class ConsumerConfig {
 	public final String esIndexType;
 	// flag to enable/disable performance metrics reporting
 	public boolean isPerfReportingEnabled;
+	// number of times to try to re-init Kafka connections/consumer if read/write to Kafka fails
+	public final int numberOfReinitAttempts;
+	// sleep time in ms between Kafka re-init atempts
+	public final int kafkaReinitSleepTimeMs;
 	
 	// Log property file for the consumer instance
 	public final String logPropertyFile;
@@ -137,6 +141,10 @@ public class ConsumerConfig {
 				"consumerSleepBetweenFetchsMs", "25"));
 		appStopTimeoutSeconds = Integer.parseInt(prop.getProperty(
 				"appStopTimeoutSeconds", "10"));
+		numberOfReinitAttempts = Integer.parseInt(prop.getProperty(
+				"numberOfReinitAttempts", "2"));
+		kafkaReinitSleepTimeMs = Integer.parseInt(prop.getProperty(
+				"kafkaReinitSleepTimeMs", "1000"));
 
 		logger.info("Config reading complete !");
 	}
@@ -147,6 +155,14 @@ public class ConsumerConfig {
 
 	public Properties getProperties() {
 		return prop;
+	}
+
+	public int getNumberOfReinitAttempts() {
+		return numberOfReinitAttempts;
+	}
+
+	public int getKafkaReinitSleepTimeMs() {
+		return kafkaReinitSleepTimeMs;
 	}
 
 }

@@ -67,6 +67,10 @@ kafkaSimpleConsumerSocketTimeoutMs=10000
 # timeout in seconds before force-stopping Indexer app and all indexer jobs
 appStopTimeoutSeconds=10
 
+# number of times to try to re-init Kafka connections/consumer if read/write to Kafka fails
+numberOfReinitTries=2
+# sleep time in ms between Kafka re-init attempts
+kafkaReinitSleepTimeMs=10000
 
 ### ElasticSearch properties ####################################
 # ElasticSearch Host and Port List for all the nodes

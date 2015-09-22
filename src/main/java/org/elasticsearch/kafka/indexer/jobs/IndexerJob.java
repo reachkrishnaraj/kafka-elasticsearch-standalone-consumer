@@ -3,6 +3,7 @@ package org.elasticsearch.kafka.indexer.jobs;
 import kafka.common.ErrorMapping;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
+
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
@@ -32,7 +33,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 	private final String currentTopic;
 	private final int currentPartition;
 
-	private int kafkaReinitSleepTimeMs = 6000;
+	private int kafkaReinitSleepTimeMs;
+	private int numberOfReinitAttempts;
     private IndexerJobStatus indexerJobStatus;
     private volatile boolean shutdownRequested = false;
     private boolean isDryRun = false;
@@ -44,6 +46,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		indexerJobStatus = new IndexerJobStatus(-1L, IndexerJobStatusEnum.Created, partition);
 		isStartingFirstTime = true;
 		isDryRun = Boolean.parseBoolean(config.isDryRun);
+		kafkaReinitSleepTimeMs = config.getKafkaReinitSleepTimeMs();
+		numberOfReinitAttempts = config.getNumberOfReinitAttempts();
 		initElasticSearch();
 		initKafka();
 		createMessageHandler();
@@ -92,16 +96,37 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 	}
 
 	void reInitKafka() throws Exception {
-		logger.info("Re-initializing Kafka for partition {}...",currentPartition);
-		kafkaConsumerClient.close();
-		logger.info("Kafka client closed for partition {}",currentPartition);
-		logger.info("Connecting to zookeeper again for partition {}",currentPartition);
-		kafkaConsumerClient.connectToZooKeeper();
-		kafkaConsumerClient.findNewLeader();
-		kafkaConsumerClient.initConsumer();
-		logger.info("Kafka Reintialization is successful. Will sleep for {} ms to allow kafka to stabilize for partition {}"
-				, kafkaReinitSleepTimeMs,currentPartition);
-		Thread.sleep(kafkaReinitSleepTimeMs);
+		for (int i = 0; i < numberOfReinitAttempts; i++) {
+			try {
+				logger.info("Re-initializing Kafka for partition {}, try # {}",
+						currentPartition, i);
+				kafkaConsumerClient.close();
+				logger.info(
+						"Kafka client closed for partition {}. Will sleep for {} ms to allow kafka to stabilize",
+						currentPartition, kafkaReinitSleepTimeMs);
+				Thread.sleep(kafkaReinitSleepTimeMs);
+				logger.info("Connecting to zookeeper again for partition {}",
+						currentPartition);
+				kafkaConsumerClient.connectToZooKeeper();
+				kafkaConsumerClient.findLeader();
+				kafkaConsumerClient.initConsumer();
+				logger.info(".. trying to get offsets info for partition {} ... ", currentPartition);
+				this.checkKafkaOffsets();
+				logger.info("Kafka Reintialization  for partition {} finished OK",
+						currentPartition);
+				return;
+			} catch (Exception e) {
+				if (i < numberOfReinitAttempts) {
+					logger.info("Re-initializing Kafka for partition {}, try # {} - still failing with Exception",
+						currentPartition, i);		
+				} else {
+					// if we got here - we failed to re-init Kafka after numberOfTries attempts - throw an exception out
+					logger.info("Kafka Re-initialization failed for partition {} after {} attempts - throwing exception: "
+							+ e.getMessage(), currentPartition, numberOfReinitAttempts);
+					throw e;
+				}
+			}
+		}		
 	}
 
 	private void createMessageHandler() throws Exception {
@@ -123,7 +148,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		shutdownRequested = true;
 	}
 
-	public void checkKafkaOffsets() {
+	public void checkKafkaOffsets() throws Exception {
 		try {
 			long currentOffset = kafkaConsumerClient.fetchCurrentOffsetFromKafka();
 			long earliestOffset = kafkaConsumerClient.getEarliestOffset();
@@ -131,8 +156,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			logger.info("Kafka offsets: currentOffset={}; earliestOffset={}; latestOffset={} for partition {}",
 					currentOffset, earliestOffset, latestOffset,currentPartition);
 		} catch (Exception e) {
-			logger.warn("Exception from checkKafkaOffsets(): for partition {}" ,currentPartition, e);
-			e.printStackTrace();
+			logger.error("Exception from checkKafkaOffsets(): for partition {}" ,currentPartition, e);
+			throw e;
 		}
 
 	}
@@ -218,13 +243,22 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
         	} catch (InterruptedException e) {
         		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Stopped);
         		stopClients();
-        	} catch(Exception e){
-        		logger.error("Exception when starting a new round of kafka Indexer job, exiting: for partition {} " ,currentPartition,e);
-        		// do not keep going if a severe error happened - stop and fix the issue manually,
-        		// then restart the consumer again; It is better to monitor the job externally 
-        		// via Zabbix or the likes - rather then keep failing [potentially] forever
-        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Failed);
-        		stopClients();
+        	} catch (Exception e){
+        		logger.error("Exception when starting a new round of kafka Indexer job for partition {} - will try to re-init Kafka " ,
+        				currentPartition, e);
+        		// try to re-init Kafka connection first - in case the leader for this partition
+        		// has changed due to a Kafka node restart and/or leader re-election
+        		try {
+        			this.reInitKafka();
+        		} catch (Exception e2) {
+        			// we still failed - do not keep going anymore - stop and fix the issue manually,
+            		// then restart the consumer again; It is better to monitor the job externally 
+            		// via Zabbix or the likes - rather then keep failing [potentially] forever
+            		logger.error("Exception when starting a new round of kafka Indexer job, partition {}, exiting: "
+            				+ e2.getMessage(), currentPartition);
+            		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Failed);
+            		stopClients();        			
+        		}
         	}       
         }
 		logger.warn("******* Indexing job was stopped, indexerJobStatus={} - exiting", indexerJobStatus);
@@ -232,7 +266,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 	}
 	
 	public void processBatch() throws Exception {
-		checkKafkaOffsets();
+		//checkKafkaOffsets();
 		long jobStartTime = 0l;
 		if (consumerConfig.isPerfReportingEnabled)
 			jobStartTime = System.currentTimeMillis();
@@ -246,11 +280,13 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			try {
 				computeOffset();
 			} catch (Exception e) {
-				logger.error("Exception getting Kafka offsets - exiting for partition {} ",currentPartition, e);
-				// do not re-init Kafka here for now - re-introduce this once limited number of tries
-				// is implemented - and when it will be clear that re-init-ing of KAfka actually worked
-				// reInitKakfa();
-				throw e;
+				logger.error("Exception getting Kafka offsets for partition {}, will try to re-init Kafka ",
+						currentPartition, e);
+				reInitKafka();
+				// if re-initialization was successful - return and let the next job run try to
+				// pickup from where it was left of before
+				// if it failed - an exception will be thrown out of the reInitKafka()
+				return;
 			}
 			// mark this as not first time startup anymore - since we already saved correct offset
 			// to Kafka, and to avoid going through the logic of figuring out the initial offset
@@ -339,8 +375,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		} catch (Exception e) {
 			logger.error("Failed to commit the Offset in Kafka after processing and posting to ES for partition {}: ",currentPartition, e);
 			logger.info("Trying to reInitialize Kafka and commit the offset again for partition {}...",currentPartition);
-			reInitKafka();
 			try {
+				reInitKafka();
 				logger.info("Attempting to commit the offset after reInitializing Kafka now..");
 				kafkaConsumerClient.saveOffsetInKafka(
 					nextOffsetToProcess, fetchResponse.errorCode(
@@ -372,7 +408,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		short errorCode = fetchResponse.errorCode(
 				consumerConfig.topic, currentPartition);
 		logger.error("Error fetching events from Kafka - handling it. Error code: {}  for partition {}"
-				, errorCode,currentPartition);
+				,errorCode, currentPartition);
 		if (errorCode == ErrorMapping.BrokerNotAvailableCode()) {
 			logger.error("BrokerNotAvailableCode error happened when fetching message from Kafka. ReInitiating Kafka Client for partition {}",currentPartition);
 			reInitKafka();
