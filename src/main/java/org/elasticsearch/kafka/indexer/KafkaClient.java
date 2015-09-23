@@ -27,7 +27,7 @@ public class KafkaClient {
 	private CuratorFramework curator;
 	private SimpleConsumer simpleConsumer;
 	private String kafkaClientId;
-	String topic;
+	private String topic;
 	private final int partition;
 	private String leaderBrokerHost;
 	private int leaderBrokerPort;
@@ -107,23 +107,48 @@ public class KafkaClient {
 		}
 	}
 		
-	private PartitionMetadata findLeader() throws Exception {
-		logger.info("Looking for Kafka leader broker for partition {}...",partition);
-		PartitionMetadata currentPartitionMetaData = null;
-		SimpleConsumer leadFindConsumer = null;
-		// take the first kafka broker from the list - it should provide all required META info anyway
-		// TODO: harden this by looping over all specified brokers if some of them fail
-		String firstBrokerStr = kafkaBrokersArray[0];
-		String[] brokerStrTokens = firstBrokerStr.split(":");
-		if (brokerStrTokens.length < 2) {
-			logger.error(
-				"Failed to find Kafka leader broker - wrong config, not enough tokens: firstBrokerStr={}", 
-				firstBrokerStr);
-			throw new Exception("Failed to find Kafka leader broker - wrong config, not enough tokens: firstBrokerStr=" + 
-				firstBrokerStr);
+	public PartitionMetadata findLeader() throws Exception {
+		logger.info("Looking for Kafka leader broker for partition {}...", partition);
+		PartitionMetadata leaderPartitionMetaData = null;
+		// try to find leader META info, trying each broker until the leader is found - 
+		// in case some of the leaders are down
+		for (int i=0; i<kafkaBrokersArray.length; i++) {
+			String brokerStr = kafkaBrokersArray[i];
+			String[] brokerStrTokens = brokerStr.split(":");
+			if (brokerStrTokens.length < 2) {
+				logger.error(
+					"Failed to find Kafka leader broker - wrong config, not enough tokens: brokerStr={}", 
+					brokerStr);
+				throw new Exception("Failed to find Kafka leader broker - wrong config, not enough tokens: brokerStr=" + 
+					brokerStr);
+			}
+			leaderPartitionMetaData = findLeaderWithBroker(brokerStrTokens[0], brokerStrTokens[1]);
+			// we found the leader - no need to query the rest of the brokers, get out of the loop
+			if (leaderPartitionMetaData != null)
+				break;
 		}
-		String kafkaBrokerHost = brokerStrTokens[0];
-		String kafkaBrokerPortStr = brokerStrTokens[1];
+		if (leaderPartitionMetaData == null || leaderPartitionMetaData.leader() == null) {
+			logger.error("Failed to find leader for topic=[{}], partition=[{}], kafka brokers list: [{}]: PartitionMetadata is null" + 
+					topic, partition, consumerConfig.kafkaBrokersList);
+			throw new Exception("Failed to find leader for topic=[" + topic + 
+					"], partition=[" + partition + 
+					", kafka brokers list: [" + consumerConfig.kafkaBrokersList +
+					"]: currentPartitionMetadata is null");
+			
+		}		
+		leaderBrokerHost = leaderPartitionMetaData.leader().host();
+		leaderBrokerPort = leaderPartitionMetaData.leader().port();
+		leaderBrokerURL = leaderBrokerHost + ":" + leaderBrokerPort;
+		logger.info("Found leader: leaderBrokerURL={}", leaderBrokerURL);
+		return leaderPartitionMetaData;
+	}
+	
+	private PartitionMetadata findLeaderWithBroker(
+			String kafkaBrokerHost, String kafkaBrokerPortStr) {
+		logger.info("Looking for leader for partition {} using Kafka Broker={}:{}, topic={}",
+				partition, kafkaBrokerHost, kafkaBrokerPortStr, topic);
+		PartitionMetadata leaderPartitionMetadata = null;
+		SimpleConsumer leadFindConsumer = null;
 		try {
 			int kafkaBrokerPort = Integer.parseInt(kafkaBrokerPortStr);
 			leadFindConsumer = new SimpleConsumer(
@@ -140,78 +165,35 @@ public class KafkaClient {
 			for (TopicMetadata item : metaData) {
 				for (PartitionMetadata part : item.partitionsMetadata()) {
 					if (part.partitionId() == partition) {
-						//System.out.println("ITS TRUE");
-						currentPartitionMetaData = part;
-					break;
+						leaderPartitionMetadata = part;
+						logger.info("Found leader for partition {} using Kafka Broker={}:{}, topic={}; leader broker URL: {}:{}",
+								partition, kafkaBrokerHost, kafkaBrokerPortStr, topic,
+								leaderPartitionMetadata.leader().host(), leaderPartitionMetadata.leader().port());
+						break;
 					}
 				}
+				// we found the leader - get out of this loop as well
+				if (leaderPartitionMetadata != null)
+					break;
 			}
 		} catch (Exception e) {
-			logger.error("Failed to find leader for Kafka Broker=[{}], topic=[{}], partition=[{}]; Error: {}" + 
-					kafkaBrokerHost, topic, partition, e.getMessage());
-			throw e;
+			logger.warn("Failed to find leader for partition {} using Kafka Broker={} , topic={}; Error: {}",
+					partition, kafkaBrokerHost, topic, e.getMessage());
 		} finally {
 			if (leadFindConsumer != null){
 				leadFindConsumer.close();
-				logger.debug("closed the leadFindConsumer connection");
+				logger.debug("Closed the leadFindConsumer connection");
 			}
 		}
-		if (currentPartitionMetaData == null) {
-			logger.error("Failed to find leader for Kafka Broker=[{}], topic=[{}], partition=[{}]: PartitionMetadata is null" + 
-					kafkaBrokerHost, topic, partition);
-			throw new Exception("Failed to find leader for Kafka Broker [" +
-					kafkaBrokerHost + "], topic=[" + topic + "], partition=[" + partition + 
-					"]: currentPartitionMetadata is null");
-			
-		}		
-		leaderBrokerHost = currentPartitionMetaData.leader().host();
-		leaderBrokerPort = currentPartitionMetaData.leader().port();
-		leaderBrokerURL = leaderBrokerHost + ":" + leaderBrokerPort;
-		logger.info("Found leader: leaderBrokerURL={}", leaderBrokerURL);
-		return currentPartitionMetaData;
+		return leaderPartitionMetadata;	
 	}
 
-	
-	public PartitionMetadata findNewLeader() throws Exception {
-		logger.info("Starting the findNewLeader() for partition {}",partition);
-		for (int i = 0; i < 3; i++) {
-			logger.info("Attempt #{}", i);
-			boolean goToSleep = false;
-            PartitionMetadata metadata = findLeader();
-            if (metadata == null) {
-            	logger.info("MetaData is Empty, going to sleep for partition {}",partition);
-            	goToSleep = true;
-            } else if (metadata.leader() == null) {
-            	logger.info("MetaData leader is Empty, going to sleep for partition {}",partition);
-            	goToSleep = true;
-            } else if (leaderBrokerHost.equalsIgnoreCase(metadata.leader().host()) && i <= 1) {
-                // first time through if the leader hasn't changed give ZooKeeper a second to recover
-                // second time, assume the broker did recover before failover, or it was a non-Broker issue
-                //
-                goToSleep = true;
-            } else {
-				logger.info("Found new leader: leadBrokerURL: {} for partition {}", leaderBrokerURL ,partition);
-                return metadata;
-            }
-            if (goToSleep) {
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException ie) {
-                }
-            }
-        }
-		logger.error("Unable to find new leader after Broker failure. Exiting");
-		throw new Exception("Unable to find new leader after Broker failure. Exiting");
-    }
-	
-	
 	public long getLastestOffset() throws Exception {
 		logger.debug("Getting LastestOffset for topic={}, partition={}, kafkaGroupId={}",
 				topic, partition, kafkaClientId);
 		long latestOffset = getOffset(topic, partition, OffsetRequest.LatestTime(), kafkaClientId);
 		logger.debug("LatestOffset={}  for partition {}", latestOffset ,partition);
-		return latestOffset;
-		
+		return latestOffset;		
 	}
 	
 	public long getEarliestOffset() throws Exception {
@@ -240,7 +222,6 @@ public class KafkaClient {
 			}
 			long[] offsets = response.offsets(topic, partition);
 			return offsets[0];
-
 		}
 		catch(Exception e){
 			logger.error("Exception when trying to get the Offset. Throwing the exception for partition {}" ,partition,e);
@@ -249,9 +230,6 @@ public class KafkaClient {
 	}
 	
 	public long fetchCurrentOffsetFromKafka() throws Exception{
-		//logger.info("Starting to fetchCurrentOffsetFromKafka");
-		// versionID = 0 - fetches offsets from Zookeeper
-		// versionID = 1 and above - from KAfka (version 0.8.2.1 and above)
 		short versionID = 0;
 		int correlationId = 0;
 		try{
