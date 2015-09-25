@@ -108,6 +108,10 @@ isDryRun=false
 
 # Time in ms for the consumer to sleep between each round of reading events from Kafka
 consumerSleepBetweenFetchsMs=10
+# number of times to try to re-init Kafka connections/consumer if read/write to Kafka fails
+numberOfReinitTries=2
+# sleep time in ms between Kafka re-init attempts
+kafkaReinitSleepTimeMs=10000
 
 # flag to enable/disable performance timings reporting; Set it to true when performance/load-testing your app, set to ‘false’ when deploying in production as it will affect performance of the app; defaults to ‘false'
 isPerfReportingEnabled=false
