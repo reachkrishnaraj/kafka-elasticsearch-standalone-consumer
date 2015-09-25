@@ -5,12 +5,14 @@ import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
 
 import org.elasticsearch.ElasticsearchException;
+import org.elasticsearch.client.transport.NoNodeAvailableException;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.kafka.indexer.ConsumerConfig;
 import org.elasticsearch.kafka.indexer.FailedEventsLogger;
+import org.elasticsearch.kafka.indexer.IndexerESException;
 import org.elasticsearch.kafka.indexer.KafkaClient;
 import org.elasticsearch.kafka.indexer.MessageHandler;
 import org.slf4j.Logger;
@@ -35,6 +37,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 
 	private int kafkaReinitSleepTimeMs;
 	private int numberOfReinitAttempts;
+	private int esIndexingRetrySleepTimeMs;
+	private int numberOfEsIndexingRetryAttempts;
     private IndexerJobStatus indexerJobStatus;
     private volatile boolean shutdownRequested = false;
     private boolean isDryRun = false;
@@ -48,6 +52,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		isDryRun = Boolean.parseBoolean(config.isDryRun);
 		kafkaReinitSleepTimeMs = config.getKafkaReinitSleepTimeMs();
 		numberOfReinitAttempts = config.getNumberOfReinitAttempts();
+		esIndexingRetrySleepTimeMs = config.getEsIndexingRetrySleepTimeMs();
+		numberOfEsIndexingRetryAttempts = config.getNumberOfEsIndexingRetryAttempts();
 		initElasticSearch();
 		initKafka();
 		createMessageHandler();
@@ -240,9 +246,14 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
         		// TODO improve sleep pattern
         		Thread.sleep(consumerConfig.consumerSleepBetweenFetchsMs * 1000);
         		logger.debug("Completed a round of indexing into ES for partition {}",currentPartition);
+        	} catch (IndexerESException e) {
+        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Failed);
+        		stopClients();
+        		break;
         	} catch (InterruptedException e) {
         		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Stopped);
         		stopClients();
+        		break;
         	} catch (Exception e){
         		logger.error("Exception when starting a new round of kafka Indexer job for partition {} - will try to re-init Kafka " ,
         				currentPartition, e);
@@ -257,7 +268,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
             		logger.error("Exception when starting a new round of kafka Indexer job, partition {}, exiting: "
             				+ e2.getMessage(), currentPartition);
             		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Failed);
-            		stopClients();        			
+            		stopClients();  
+            		break;
         		}
         	}       
         }
@@ -347,19 +359,9 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			logger.info("**** This is a dry run, NOT committing the offset in Kafka nor posting to ES for partition {}****",currentPartition);
 			return;
 		}
-		try {
-			logger.info("posting the messages to ElasticSearch for partition {}...",currentPartition);
-			msgHandler.postToElasticSearch();
-		} catch (ElasticsearchException e) {
-			// TODO decide how to handle / fail in this case
-			// for now - just continue and commit the offset, 
-			// but be aware that ALL messages from this batch are NOT indexed into ES
-			logger.error("Error posting messages to Elastic Search for offset {}-->{} in partition {} skipping them: ",offsetForThisRound,nextOffsetToProcess-1,currentPartition, e);
-			FailedEventsLogger.logFailedEvent(offsetForThisRound, nextOffsetToProcess - 1, currentPartition, e.getDetailedMessage(), null);
-			// do not re-init ES - as we do not know if this would help or not
-			//this.reInitElasticSearch();
-		}
 
+		this.indexIntoESWithRetries();
+		
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAftEsPost = System.currentTimeMillis();
 			logger.debug("Approx time to post of ElasticSearch: {} ms for partition {}",
@@ -403,6 +405,50 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		this.fetchResponse = null;
 	}
 
+	private void indexIntoESWithRetries() throws IndexerESException, Exception {
+		try {
+			logger.info("posting the messages to ElasticSearch for partition {}...",currentPartition);
+			msgHandler.postToElasticSearch();
+		} catch (NoNodeAvailableException e) {
+			// ES cluster is unreachable or down. Re-try up to the configured number of times
+			// if fails even after then - shutdown the current IndexerJob
+			logger.error("Error posting messages to Elastic Search for offset {}-->{} " + 
+					" in partition {}:  NoNodeAvailableException - ES cluster is unreachable, will retry after sleeping for {}ms", 
+					offsetForThisRound, nextOffsetToProcess-1, esIndexingRetrySleepTimeMs, currentPartition, e);
+			for (int i=1; i<=numberOfEsIndexingRetryAttempts; i++ ){
+				Thread.sleep(esIndexingRetrySleepTimeMs);
+				logger.info("Retrying indexing into ES after a connection failure, partition {}, try# {}", 
+						currentPartition, i);
+				try {
+					msgHandler.postToElasticSearch();
+					// we succeeded - get out of the loop
+					break;
+				} catch (NoNodeAvailableException e2) {
+					if (i<numberOfEsIndexingRetryAttempts){
+						// do not fail yet - will re-try again
+						logger.error("Retrying indexing into ES after a connection failure, partition {}, try# {} - failed again", 
+								currentPartition, i);						
+					} else {
+						//we've exhausted the number of retries - throw a IndexerESException to stop the IndexerJob thread
+						logger.error("Retrying indexing into ES after a connection failure, partition {}, "
+								+ "try# {} - failed after the last retry; Will shot down the job", 
+								currentPartition, i);						
+						throw new IndexerESException("Indexing into ES failed due to connectivity issue to ES, partition: " +
+							currentPartition);
+					}
+				}
+			}
+		} catch (ElasticsearchException e) {
+			// we are assuming that other exceptions are data-specific
+			// -  continue and commit the offset, 
+			// but be aware that ALL messages from this batch are NOT indexed into ES
+			logger.error("Error posting messages to Elastic Search for offset {}-->{} in partition {} skipping them: ",
+					offsetForThisRound, nextOffsetToProcess-1, currentPartition, e);
+			FailedEventsLogger.logFailedEvent(offsetForThisRound, nextOffsetToProcess - 1, currentPartition, e.getDetailedMessage(), null);
+		}
+	
+	}
+	
 	public void handleError() throws Exception {
 		// Do things according to the error code
 		short errorCode = fetchResponse.errorCode(
@@ -479,13 +525,16 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 
 	}
 	public void stopClients() {
-		logger.info("About to stop ES client ");
+		logger.info("About to stop ES client for topic {}, partition {}", 
+				currentTopic, currentPartition);
 		if (esClient != null)
 			esClient.close();
-		logger.info("About to stop Kafka client ");
+		logger.info("About to stop Kafka client for topic {}, partition {}", 
+				currentTopic, currentPartition);
 		if (kafkaConsumerClient != null)
 			kafkaConsumerClient.close();
-		logger.info("Stopped Kafka client");
+		logger.info("Stopped Kafka and ES clients for topic {}, partition {}", 
+				currentTopic, currentPartition);
 	}
 
 }

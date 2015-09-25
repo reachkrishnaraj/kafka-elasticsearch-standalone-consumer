@@ -65,6 +65,10 @@ public class ConsumerConfig {
 	public final int numberOfReinitAttempts;
 	// sleep time in ms between Kafka re-init atempts
 	public final int kafkaReinitSleepTimeMs;
+	// sleep time in ms between attempts to index data into ES again
+	public final int esIndexingRetrySleepTimeMs;
+	// number of times to try to index data into ES if ES cluster is not reachable
+	public final int numberOfEsIndexingRetryAttempts;
 	
 	// Log property file for the consumer instance
 	public final String logPropertyFile;
@@ -145,7 +149,10 @@ public class ConsumerConfig {
 				"numberOfReinitAttempts", "2"));
 		kafkaReinitSleepTimeMs = Integer.parseInt(prop.getProperty(
 				"kafkaReinitSleepTimeMs", "1000"));
-
+		esIndexingRetrySleepTimeMs = Integer.parseInt(prop.getProperty(
+				"esIndexingRetrySleepTimeMs", "1000"));
+		numberOfEsIndexingRetryAttempts = Integer.parseInt(prop.getProperty(
+				"numberOfEsIndexingRetryAttempts", "2"));
 		logger.info("Config reading complete !");
 	}
 
@@ -163,6 +170,18 @@ public class ConsumerConfig {
 
 	public int getKafkaReinitSleepTimeMs() {
 		return kafkaReinitSleepTimeMs;
+	}
+
+	public String getEsIndexType() {
+		return esIndexType;
+	}
+
+	public int getEsIndexingRetrySleepTimeMs() {
+		return esIndexingRetrySleepTimeMs;
+	}
+
+	public int getNumberOfEsIndexingRetryAttempts() {
+		return numberOfEsIndexingRetryAttempts;
 	}
 
 }
