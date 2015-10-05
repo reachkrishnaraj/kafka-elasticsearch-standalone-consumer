@@ -1,5 +1,8 @@
 # Welcome to the kafka-elasticsearch-standalone-consumer wiki!
 
+## Please use "branch2.0" branch
+
+
 ## Illustration of kafka-elasticsearch-standalone-consumer usage
 
 ### The consumer is positioned in the middle.
