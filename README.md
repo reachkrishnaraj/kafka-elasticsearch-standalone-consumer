@@ -1,6 +1,6 @@
 # Welcome to the kafka-elasticsearch-standalone-consumer wiki!
 
-## Please use "branch2.0" branch
+## Please use "branch2.0" branch for enhanced version of this project
 
 
 ## Illustration of kafka-elasticsearch-standalone-consumer usage
