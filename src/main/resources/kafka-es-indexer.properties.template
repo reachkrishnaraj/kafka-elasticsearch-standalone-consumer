@@ -108,6 +108,10 @@ isDryRun=false
 
 # Time in ms for the consumer to sleep between each round of reading events from Kafka
 consumerSleepBetweenFetchsMs=10
+# number of times to try to re-connect to ES when performing batch indexing , if connection to ES fails
+numberOfEsIndexingRetryAttempts=2
+# sleep time in ms between attempts to connect to ES
+esIndexingRetrySleepTimeMs=10000
 
 # flag to enable/disable performance timings reporting; Set it to true when performance/load-testing your app, set to ‘false’ when deploying in production as it will affect performance of the app; defaults to ‘false'
 isPerfReportingEnabled=false
