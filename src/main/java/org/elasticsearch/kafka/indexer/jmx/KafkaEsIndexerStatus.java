@@ -21,10 +21,6 @@ public class KafkaEsIndexerStatus implements KafkaEsIndexerStatusMXBean {
 			return true;
 	}
 
-	public void refreshCounters() {
-		
-	}
-
 	public List<IndexerJobStatus> getStatuses() {
 		return indexerJobManager.getJobStatuses();
 	}
