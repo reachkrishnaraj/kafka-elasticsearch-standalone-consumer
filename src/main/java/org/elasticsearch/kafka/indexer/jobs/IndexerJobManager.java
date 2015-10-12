@@ -5,6 +5,7 @@ import org.elasticsearch.kafka.indexer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
@@ -56,8 +57,12 @@ public class IndexerJobManager {
 		indexerJobFutures = executorService.invokeAll(indexerJobs.values());
 	}
 
-	public void getJobStatuses(){
-		// TODO check all jobs and return a list of IndexerJobStatus'es
+	public List<IndexerJobStatus> getJobStatuses(){
+		List <IndexerJobStatus> indexerJobStatuses = new ArrayList<IndexerJobStatus>();
+		for (IndexerJob indexerJob: indexerJobs.values()){
+			indexerJobStatuses.add(indexerJob.getIndexerJobStatus());
+		}
+		return indexerJobStatuses;
 	}
 
 	public void stop() {

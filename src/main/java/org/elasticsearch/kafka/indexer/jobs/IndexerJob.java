@@ -536,5 +536,9 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		logger.info("Stopped Kafka and ES clients for topic {}, partition {}", 
 				currentTopic, currentPartition);
 	}
+	
+	public IndexerJobStatus getIndexerJobStatus() {
+		return indexerJobStatus;
+	}
 
 }
