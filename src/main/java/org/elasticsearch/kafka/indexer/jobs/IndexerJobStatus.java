@@ -1,6 +1,8 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
-public class IndexerJobStatus {
+import org.elasticsearch.kafka.indexer.jmx.IndexerJobStatusMBean;
+
+public class IndexerJobStatus implements IndexerJobStatusMBean{
 
 	private long lastCommittedOffset;
 	private IndexerJobStatusEnum jobStatus;
