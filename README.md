@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/BigDataDevs/kafka-elasticsearch-consumer.svg)](https://travis-ci.org/BigDataDevs/kafka-elasticsearch-consumer)
 # Welcome to the kafka-elasticsearch-standalone-consumer wiki!
 
 ## Architecture of the kafka-elasticsearch-standalone-consumer [indexer]
