@@ -183,6 +183,6 @@ kafka-elasticsearch-standalone-consumer
 	under the License.
 
 # Contributors
-
+ - [Marina Popova](https://github.com/ppine7)
+ - [Dhyan ](https://github.com/dhyan-yottaa)
  - [Krishna Raj](https://github.com/reachkrishnaraj)
- - [Chandrasekar Ramalingam](https://github.com/cramal1)
