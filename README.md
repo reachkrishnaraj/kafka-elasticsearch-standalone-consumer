@@ -44,7 +44,9 @@
 		cd $CONSUMER_HOME
      	mvn clean package
      	
-	The kafka-es-consumer-0.2.jar will be created in the $CONSUMER_HOME/bin, with all dependencies included into the JAR
+ The kafka-es-consumer-0.2.jar will be created in the $CONSUMER_HOME/bin.
+ All dependencies will be placed into $CONSUMER_HOME/bin/lib.
+ All JAR dependencies are linked via kafka-es-consumer-0.2.jar manifest.
 
 **5. run the app [use JDK1.8] :  
 
