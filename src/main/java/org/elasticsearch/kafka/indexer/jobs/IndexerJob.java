@@ -308,7 +308,13 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		}
 		indexerJobStatus.setLastCommittedOffset(offsetForThisRound);
 		
-		fetchResponse = kafkaConsumerClient.getMessagesFromKafka(offsetForThisRound);
+		try{
+			fetchResponse = kafkaConsumerClient.getMessagesFromKafka(offsetForThisRound);
+		} catch (Exception e){
+			// try re-process this batch
+			reInitKafka();
+			return;
+		}
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAfterKafaFetch = System.currentTimeMillis();
 			logger.debug("Fetched the reponse from Kafka. Approx time taken is {} ms for partition {}",
