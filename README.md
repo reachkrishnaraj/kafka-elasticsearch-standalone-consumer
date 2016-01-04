@@ -48,9 +48,12 @@
  All dependencies will be placed into $CONSUMER_HOME/bin/lib.
  All JAR dependencies are linked via kafka-es-consumer-0.2.jar manifest.
 
-**5. run the app [use JDK1.8] :  
+**5. Add all jars  in lib folder to classpath
 
-		java -Dlogback.configurationFile=/your/absolute/path/logback.xml -jar $CONSUMER_HOME/bin/kafka-es-consumer-0.2.jar /your/absolute/path/kafkaESConsumer.properties
+**6. run the app [use JDK1.8] :  
+Add all jars  in lib folder to classpath
+
+		java -Dlogback.configurationFile=/your/absolute/path/logback.xml org.elasticsearch.kafka.indexer.KafkaIndexerDriver /your/absolute/path/kafkaESConsumer.properties
 
  
 # Versions
