@@ -28,28 +28,33 @@
 
 ### Running as a standard Jar 
 
-**1. Download the code into a `$CONSUMER_HOME` dir.
+**1. Download the code into a `$INDEXER_HOME` dir.
 
-**2. cp `$CONSUMER_HOME`/src/main/resources/kafkaESConsumer.properties.template /your/absolute/path/kafkaESConsumer.properties file - update all relevant properties as explained in the comments
+**2. cp `$INDEXER_HOME`/src/main/resources/kafka-es-indexer.properties.template /your/absolute/path/kafka-es-indexer.properties file - update all relevant properties as explained in the comments
 
-**3. cp `$CONSUMER_HOME`/src/main/resources/logback.xml.template /your/absolute/path/logback.xml
+**3. cp `$INDEXER_HOME`/src/main/resources/logback.xml.template /your/absolute/path/logback.xml
 
  specify directory you want to store logs in:
 	<property name="LOG_DIR" value="/tmp"/>
 	
  adjust values of max sizes and number of log files as needed
 
-**4. build/create the app jar:
+**4. build/create the app jar (make sure you have MAven installed):
 
-		cd $CONSUMER_HOME
+		cd $INDEXER_HOME
      	mvn clean package
      	
-	The kafka-es-consumer-0.2.jar will be created in the $CONSUMER_HOME/bin, with all dependencies included into the JAR
+ The kafka-es-indexer-2.0.jar will be created in the $INDEXER_HOME/bin.
+ All dependencies will be placed into $INDEXER_HOME/bin/lib.
+ All JAR dependencies are linked via kafka-es-indexer-2.0.jar manifest.
 
-**5. run the app [use JDK1.8] :  
+**5. edit your $INDEXER_HOME/run_indexer.sh script:
+		-- make it executable if needed (chmod a+x $INDEXER_HOME/run_indexer.sh)
+		-- update properties marked with "CHANGE FOR YOUR ENV" comments - according to your environment
 
-		java -Dlogback.configurationFile=/your/absolute/path/logback.xml -jar $CONSUMER_HOME/bin/kafka-es-consumer-0.2.jar /your/absolute/path/kafkaESConsumer.properties
+**6. run the app [use JDK1.8] :  
 
+		./run_indexer.sh
  
 # Versions
 
@@ -108,6 +113,6 @@ kafka-elasticsearch-standalone-consumer
 	under the License.
 
 # Contributors
+ - [Krishna Raj](https://github.com/reachkrishnaraj)
  - [Marina Popova](https://github.com/ppine7)
  - [Dhyan ](https://github.com/dhyan-yottaa)
- - [Krishna Raj](https://github.com/reachkrishnaraj)
