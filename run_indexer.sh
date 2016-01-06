@@ -23,11 +23,8 @@ echo "INDEXER_PROPERTIES_FILE=$INDEXER_PROPERTIES_FILE"
 # add all dependent jars to the classpath
 for file in $INDEXER_HOME/bin/lib/*.jar;
 do
-  LIBS=$LIBS:$file
+  CLASS_PATH=$CLASS_PATH:$file
 done
-#echo "LIBS=$LIBS"
-
-CLASS_PATH=$LIBS:$INDEXER_HOME/bin/kafka-es-indexer-2.0.jar
 echo "CLASS_PATH=$CLASS_PATH"
 
 $JAVA_HOME/bin/java -Xmx1g -cp $CLASS_PATH -Dlogback.configurationFile=$LOGBACK_CONFIG_FILE org.elasticsearch.kafka.indexer.KafkaIndexerDriver $INDEXER_PROPERTIES_FILE
