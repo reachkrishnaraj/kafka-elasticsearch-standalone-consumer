@@ -159,13 +159,13 @@
 				</executions>
 			</plugin>
 			<plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>2.6</version>
-        <configuration>
-          <outputDirectory>${project.build.directory}/lib/</outputDirectory>
-        </configuration>
-      </plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>2.6</version>
+				<configuration>
+				<outputDirectory>${project.build.directory}/lib/</outputDirectory>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 </project>
