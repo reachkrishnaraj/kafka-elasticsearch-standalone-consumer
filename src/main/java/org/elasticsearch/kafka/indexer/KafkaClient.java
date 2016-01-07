@@ -128,7 +128,7 @@ public class KafkaClient {
 				break;
 		}
 		if (leaderPartitionMetaData == null || leaderPartitionMetaData.leader() == null) {
-			logger.error("Failed to find leader for topic=[{}], partition=[{}], kafka brokers list: [{}]: PartitionMetadata is null" + 
+			logger.error("Failed to find leader for topic=[{}], partition=[{}], kafka brokers list: [{}]: PartitionMetadata is null",
 					topic, partition, consumerConfig.kafkaBrokersList);
 			throw new Exception("Failed to find leader for topic=[" + topic + 
 					"], partition=[" + partition + 
@@ -265,11 +265,7 @@ public class KafkaClient {
 			throw e;
 		}
 	}
-	
-	public ByteBufferMessageSet fetchMessageSet(FetchResponse fetchReponse){
-		return fetchReponse.messageSet(topic, partition);
-	}
-	
+		
 	public void close() {
 		curator.close();
 		logger.info("Curator/Zookeeper connection closed");
