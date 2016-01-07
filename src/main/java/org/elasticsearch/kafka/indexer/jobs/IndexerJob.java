@@ -194,7 +194,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 				// to processing events that may have already be processed - but it is safer than
 				// starting from the Latest offset in case not all events were processed before				
 				offsetForThisRound = kafkaConsumerClient.getEarliestOffset();
-				logger.info("offsetForThisRound is set to the EarliestOffset since currentOffset is -1; offsetForThisRound={} for partition {}s",
+				logger.info("offsetForThisRound is set to the EarliestOffset since currentOffset is -1; offsetForThisRound={} for partition {}",
 						offsetForThisRound,currentPartition);
 				// also store this as the CurrentOffset to Kafka - to avoid the multiple cycles through
 				// this logic in the case no events are coming to the topic for a long time and
