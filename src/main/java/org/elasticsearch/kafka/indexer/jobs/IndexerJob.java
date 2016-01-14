@@ -194,7 +194,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 				// to processing events that may have already be processed - but it is safer than
 				// starting from the Latest offset in case not all events were processed before				
 				offsetForThisRound = kafkaConsumerClient.getEarliestOffset();
-				logger.info("offsetForThisRound is set to the EarliestOffset since currentOffset is -1; offsetForThisRound={} for partition {}s",
+				logger.info("offsetForThisRound is set to the EarliestOffset since currentOffset is -1; offsetForThisRound={} for partition {}",
 						offsetForThisRound,currentPartition);
 				// also store this as the CurrentOffset to Kafka - to avoid the multiple cycles through
 				// this logic in the case no events are coming to the topic for a long time and
@@ -211,6 +211,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			}
 		}
 		long earliestOffset = kafkaConsumerClient.getEarliestOffset();
+		logger.info("EarliestOffset for partition {} is {}", currentPartition, earliestOffset);
 		// check for a corner case when the computed offset (either current or custom)
 		// is less than the Earliest offset - which could happen if some messages were 
 		// cleaned up from the topic/partition due to retention policy
@@ -239,7 +240,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
                     throw new InterruptedException(
                     	"Cought interrupted event in IndexerJob for partition=" + currentPartition + " - stopping");
                 }
-        		logger.info("******* Starting a new batch of events from Kafka for partition {} ...", currentPartition);
+        		logger.debug("******* Starting a new batch of events from Kafka for partition {} ...", currentPartition);
         		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.InProgress);
         		processBatch();
         		// sleep for configured time
@@ -328,14 +329,14 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		}
 		
 		// TODO harden the byteBufferMessageSEt life-cycle - make local var
-		byteBufferMsgSet = kafkaConsumerClient.fetchMessageSet(fetchResponse);
+		byteBufferMsgSet = fetchResponse.messageSet(currentTopic, currentPartition);
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAfterKafkaFetch = System.currentTimeMillis();
 			logger.debug("Completed MsgSet fetch from Kafka. Approx time taken is {} ms for partition {}",
 					(timeAfterKafkaFetch - jobStartTime) ,currentPartition);
 		}
 		if (byteBufferMsgSet.validBytes() <= 0) {
-			logger.warn("No events were read from Kafka - finishing this round of reads from Kafka for partition {}",currentPartition);
+			logger.debug("No events were read from Kafka - finishing this round of reads from Kafka for partition {}",currentPartition);
 			// TODO re-review this logic
 			long latestOffset = kafkaConsumerClient.getLastestOffset();
 			if (latestOffset != offsetForThisRound) {
@@ -480,23 +481,23 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		} else if (errorCode == ErrorMapping.OffsetMetadataTooLargeCode()) {
 			logger.error("OffsetMetadataTooLargeCode error happened when fetching message from Kafka, not handling it. Returning for partition {}",currentPartition);
 		} else if (errorCode == ErrorMapping.OffsetOutOfRangeCode()) {
-			logger.error("OffsetOutOfRangeCode error happened when fetching message from Kafka for partition {}",currentPartition);
-			// It is better not to try to fix this issue programmatically: if the offset is wrong,
-			// either this is the first time we read form Kafka or not - it is better to figure out 
-			// why it is wrong and fix the corresponding logic or CUSTOM offset, 
-			// rather than blindly reset it to the Latest offset
-			/*
-			if (isStartingFirstTime) {
-				logger.info("Handling OffsetOutOfRange error: This is 1st round of consumer, hence setting the StartOffsetFrom = LATEST. This will ensure that the latest offset is picked up in next try");
-				consumerConfig.setStartOffsetFrom("LATEST");
-			} else {
-				logger.info("Handling OffsetOutOfRange error: This is not the 1st round of consumer, hence will get the latest offset and setting it as offsetForThisRound and will read from latest");
-				long latestOffset = kafkaConsumerClient.getLastestOffset();
-				logger.info("Handling OffsetOutOfRange error. Will try to read from the LatestOffset = "
-						+ latestOffset);
-				offsetForThisRound = latestOffset;
+			logger.error("OffsetOutOfRangeCode error fetching messages for partition={}, offsetForThisRound={}",
+					currentPartition, offsetForThisRound);
+			long earliestOffset = kafkaConsumerClient.getEarliestOffset();
+			// The most likely reason for this error is that the consumer is trying to read events from an offset
+			// that has already expired from the Kafka topic due to retention period;
+			// In that case the only course of action is to start processing events from the EARLIEST available offset
+			logger.info("OffsetOutOfRangeCode error: setting offset for partition {} to the EARLIEST possible offset: {}", 
+					currentPartition, earliestOffset);
+			nextOffsetToProcess = earliestOffset;
+			try {
+				kafkaConsumerClient.saveOffsetInKafka(earliestOffset, errorCode);
+			} catch (Exception e) {
+				// throw an exception as this will break reading messages in the next round
+				// TODO verify that the IndexerJob is stopped cleanly in this case
+				logger.error("Failed to commit offset in Kafka after OffsetOutOfRangeCode - exiting for partition {} ", currentPartition, e);
+				throw e;
 			}
-			/*  */
 			return;
 
 		} else if (errorCode == ErrorMapping.ReplicaNotAvailableCode()) {
