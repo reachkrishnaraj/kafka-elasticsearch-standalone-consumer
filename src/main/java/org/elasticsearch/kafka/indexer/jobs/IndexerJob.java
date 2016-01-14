@@ -489,7 +489,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			// In that case the only course of action is to start processing events from the EARLIEST available offset
 			logger.info("OffsetOutOfRangeCode error: setting offset for partition {} to the EARLIEST possible offset: {}", 
 					currentPartition, earliestOffset);
-			offsetForThisRound = earliestOffset;
+			nextOffsetToProcess = earliestOffset;
 			try {
 				kafkaConsumerClient.saveOffsetInKafka(earliestOffset, errorCode);
 			} catch (Exception e) {
