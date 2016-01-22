@@ -368,13 +368,14 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			logger.info("**** This is a dry run, NOT committing the offset in Kafka nor posting to ES for partition {}****",currentPartition);
 			return;
 		}
-		
-		try{
-		this.indexIntoESWithRetries();
-		} catch (IndexerESException e){
-			
+
+		try {
+			this.indexIntoESWithRetries();
+		} catch (IndexerESException e) {
+			// re-process batch
 			return;
 		}
+		
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAftEsPost = System.currentTimeMillis();
 			logger.debug("Approx time to post of ElasticSearch: {} ms for partition {}",
