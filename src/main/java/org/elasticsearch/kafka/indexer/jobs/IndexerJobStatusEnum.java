@@ -6,6 +6,7 @@ public enum IndexerJobStatusEnum {
 	Initialized,
 	Started,
 	InProgress,
+	Hanging,
 	Stopped,
 	Cancelled,
 	Failed

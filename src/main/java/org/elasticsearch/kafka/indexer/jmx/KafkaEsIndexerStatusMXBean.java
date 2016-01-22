@@ -10,5 +10,6 @@ public interface KafkaEsIndexerStatusMXBean {
 	int getCountOfFailedJobs();
 	int getCountOfCancelledJobs();
 	int getCountOfStoppedJobs();
+	int getCountOfHangingJobs();
 
 }

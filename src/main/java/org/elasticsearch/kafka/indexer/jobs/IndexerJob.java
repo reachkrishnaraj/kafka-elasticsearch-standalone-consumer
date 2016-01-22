@@ -1,8 +1,6 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
-import kafka.common.ErrorMapping;
-import kafka.javaapi.FetchResponse;
-import kafka.javaapi.message.ByteBufferMessageSet;
+import java.util.concurrent.Callable;
 
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.client.transport.NoNodeAvailableException;
@@ -18,7 +16,9 @@ import org.elasticsearch.kafka.indexer.MessageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.Callable;
+import kafka.common.ErrorMapping;
+import kafka.javaapi.FetchResponse;
+import kafka.javaapi.message.ByteBufferMessageSet;
 
 public class IndexerJob implements Callable<IndexerJobStatus> {
 
@@ -278,6 +278,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		return indexerJobStatus;
 	}
 	
+	
+	
 	public void processBatch() throws Exception {
 		//checkKafkaOffsets();
 		long jobStartTime = 0l;
@@ -367,7 +369,12 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			return;
 		}
 
-		this.indexIntoESWithRetries();
+		try {
+			this.indexIntoESWithRetries();
+		} catch (IndexerESException e) {
+			// re-process batch
+			return;
+		}
 		
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAftEsPost = System.currentTimeMillis();
@@ -412,6 +419,36 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		this.fetchResponse = null;
 	}
 
+	private void reInitElasticSearch() throws InterruptedException, IndexerESException {
+		for (int i=1; i<=numberOfEsIndexingRetryAttempts; i++ ){
+			Thread.sleep(esIndexingRetrySleepTimeMs);
+			logger.warn("Retrying connect to ES and re-process batch, partition {}, try# {}", 
+					currentPartition, i);
+			try {
+				this.initElasticSearch();
+				// we succeeded - get out of the loop
+				break;
+			} catch (Exception e2) {
+				if (i<numberOfEsIndexingRetryAttempts){
+					// do not fail yet - will re-try again
+					indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Hanging);
+					logger.warn("Retrying connect to ES and re-process batch, partition {}, try# {} - failed again", 
+							currentPartition, i);						
+				} else {
+					//we've exhausted the number of retries - throw a IndexerESException to stop the IndexerJob thread
+					logger.error("Retrying connect to ES and re-process batch after connection failure, partition {}, "
+							+ "try# {} - failed after the last retry; Will keep retrying, ", 
+							currentPartition, i);						
+					
+					indexerJobStatus.setJobStatus(IndexerJobStatusEnum.Hanging);
+					throw new IndexerESException("Indexing into ES failed due to connectivity issue to ES, partition: " +
+						currentPartition);
+				}
+			}
+		}
+	}
+
+	
 	private void indexIntoESWithRetries() throws IndexerESException, Exception {
 		try {
 			logger.info("posting the messages to ElasticSearch for partition {}...",currentPartition);
@@ -420,31 +457,13 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			// ES cluster is unreachable or down. Re-try up to the configured number of times
 			// if fails even after then - shutdown the current IndexerJob
 			logger.error("Error posting messages to Elastic Search for offset {}-->{} " + 
-					" in partition {}:  NoNodeAvailableException - ES cluster is unreachable, will retry after sleeping for {}ms", 
+					" in partition {}:  NoNodeAvailableException - ES cluster is unreachable, will retry to connect after sleeping for {}ms", 
 					offsetForThisRound, nextOffsetToProcess-1, esIndexingRetrySleepTimeMs, currentPartition, e);
-			for (int i=1; i<=numberOfEsIndexingRetryAttempts; i++ ){
-				Thread.sleep(esIndexingRetrySleepTimeMs);
-				logger.info("Retrying indexing into ES after a connection failure, partition {}, try# {}", 
-						currentPartition, i);
-				try {
-					msgHandler.postToElasticSearch();
-					// we succeeded - get out of the loop
-					break;
-				} catch (NoNodeAvailableException e2) {
-					if (i<numberOfEsIndexingRetryAttempts){
-						// do not fail yet - will re-try again
-						logger.error("Retrying indexing into ES after a connection failure, partition {}, try# {} - failed again", 
-								currentPartition, i);						
-					} else {
-						//we've exhausted the number of retries - throw a IndexerESException to stop the IndexerJob thread
-						logger.error("Retrying indexing into ES after a connection failure, partition {}, "
-								+ "try# {} - failed after the last retry; Will shot down the job", 
-								currentPartition, i);						
-						throw new IndexerESException("Indexing into ES failed due to connectivity issue to ES, partition: " +
-							currentPartition);
-					}
-				}
-			}
+			
+			reInitElasticSearch();
+			//throws Exception to re-process current batch
+			throw new IndexerESException();
+			
 		} catch (ElasticsearchException e) {
 			// we are assuming that other exceptions are data-specific
 			// -  continue and commit the offset, 
@@ -455,6 +474,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 		}
 	
 	}
+	
 	
 	public void handleError() throws Exception {
 		// Do things according to the error code

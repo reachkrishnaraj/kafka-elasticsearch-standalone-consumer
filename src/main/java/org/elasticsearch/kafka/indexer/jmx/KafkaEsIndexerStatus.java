@@ -12,6 +12,7 @@ public class KafkaEsIndexerStatus implements KafkaEsIndexerStatusMXBean {
 	private int failedJobs;
 	private int cancelledJobs;
 	private int stoppedJobs;
+	private int hangingJobs;
 
 	public KafkaEsIndexerStatus(IndexerJobManager indexerJobManager) {
 		this.indexerJobManager = indexerJobManager;
@@ -43,6 +44,16 @@ public class KafkaEsIndexerStatus implements KafkaEsIndexerStatusMXBean {
 			}
 		}
 		return stoppedJobs;
+	}
+	
+	public int getCountOfHangingJobs() {
+		hangingJobs = 0;
+		for (IndexerJobStatus jobStatus : indexerJobManager.getJobStatuses()) {
+			if (jobStatus.getJobStatus().equals(IndexerJobStatusEnum.Hanging)){
+				hangingJobs++;
+			}
+		}
+		return hangingJobs;
 	}
 
 	public int getCountOfCancelledJobs() {
