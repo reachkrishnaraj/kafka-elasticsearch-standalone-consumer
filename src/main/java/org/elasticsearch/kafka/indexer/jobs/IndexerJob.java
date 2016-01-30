@@ -357,7 +357,9 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			return;
 		}
 		logger.debug("Starting to prepare for post to ElasticSearch for partition {}",currentPartition);
-		nextOffsetToProcess = msgHandler.prepareForPostToElasticSearch(byteBufferMsgSet.iterator());
+		//Need to save nextOffsetToProcess in temporary field, 
+		//and save it after successful execution of indexIntoESWithRetries method 
+		long proposedNextOffsetToProcess = msgHandler.prepareForPostToElasticSearch(byteBufferMsgSet.iterator());
 
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAtPrepareES = System.currentTimeMillis();
@@ -375,6 +377,8 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			// re-process batch
 			return;
 		}
+		
+		nextOffsetToProcess = proposedNextOffsetToProcess;
 		
 		if (consumerConfig.isPerfReportingEnabled) {
 			long timeAftEsPost = System.currentTimeMillis();
