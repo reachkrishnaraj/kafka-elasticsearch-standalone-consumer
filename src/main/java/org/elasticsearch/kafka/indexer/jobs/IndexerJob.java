@@ -241,8 +241,9 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
                     	"Cought interrupted event in IndexerJob for partition=" + currentPartition + " - stopping");
                 }
         		logger.debug("******* Starting a new batch of events from Kafka for partition {} ...", currentPartition);
-        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.InProgress);
+        		
         		processBatch();
+        		indexerJobStatus.setJobStatus(IndexerJobStatusEnum.InProgress);	
         		// sleep for configured time
         		// TODO improve sleep pattern
         		Thread.sleep(consumerConfig.consumerSleepBetweenFetchsMs * 1000);
@@ -291,6 +292,7 @@ public class IndexerJob implements Callable<IndexerJobStatus> {
 			// we can rely on the in-memory nextOffsetToProcess variable
 			offsetForThisRound = nextOffsetToProcess;
 		} else {
+			indexerJobStatus.setJobStatus(IndexerJobStatusEnum.InProgress);
 			// if this is the first time we run the Consumer - get it from Kafka
 			try {
 				computeOffset();
