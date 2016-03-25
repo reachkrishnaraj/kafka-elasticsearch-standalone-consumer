@@ -5,6 +5,9 @@
 ![](https://raw.githubusercontent.com/ppine7/kafka-elasticsearch-standalone-consumer/master/img/IndexerV2Design.jpg)
 
 
+# This project is moved to below link. 
+Please see https://github.com/BigDataDevs/kafka-elasticsearch-consumer
+
 # Introduction
 
 ### **Kafka Standalone Consumer [Indexer] will read messages from Kafka, in batches, process and bulk-index them into ElasticSearch.**
