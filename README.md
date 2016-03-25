@@ -5,7 +5,7 @@
 ![](https://raw.githubusercontent.com/ppine7/kafka-elasticsearch-standalone-consumer/master/img/IndexerV2Design.jpg)
 
 
-# This project is moved to below link. 
+# This project has moved to below repository
 ### Please see https://github.com/BigDataDevs/kafka-elasticsearch-consumer
 
 # Introduction
